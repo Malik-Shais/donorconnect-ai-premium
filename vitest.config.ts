@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import path from "node:path";
 
-const KEYS = ["TEST_DATABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "MAILPIT_URL", "EMAIL_SMTP_URL"];
+const KEYS = ["TEST_DATABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "MAILPIT_URL", "EMAIL_SMTP_URL", "RATE_LIMIT_SECRET"];
 const pickEnv = () => Object.fromEntries(KEYS.filter((k) => process.env[k]).map((k) => [k, process.env[k] as string]));
 
 export default defineConfig({

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { limiterSecret } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 // Persistent, multi-process-safe limits live in PostgreSQL (anon_rate_limit). Subjects are SHA-256 hashes of the lower-cased email,
@@ -10,7 +11,7 @@ export const tooMany = (seconds: number) => `Too many attempts. Please try again
 
 /** Returns a user-facing message when blocked, otherwise null. Fails CLOSED if the limiter itself errors. */
 export async function anonLimit(action: string, subject: string, count = true): Promise<string | null> {
-  const { data, error } = await (await createClient()).rpc("anon_rate_limit", { p_action: action, p_subject: hash(subject), p_count: count });
+  const { data, error } = await (await createClient({ "x-limiter-secret": limiterSecret() })).rpc("anon_rate_limit", { p_action: action, p_subject: hash(subject), p_count: count });
   if (error) return "Please try again in a moment.";
   return (data as number) > 0 ? tooMany(data as number) : null;
 }

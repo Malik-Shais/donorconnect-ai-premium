@@ -83,7 +83,7 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
 
 function UnreadBadge({ fallback, className }: { fallback: number; className?: string }) {
   const n = useNotifications(), count = n ? n.unread : fallback;
-  return count > 0 ? <span data-testid="unread-badge" aria-label={`${count} unread`} className={cn("rounded-full bg-coral px-2 text-xs font-bold text-white", className ?? "ml-auto")}>{count}</span> : null;
+  return count > 0 ? <span data-testid="unread-badge" aria-label={`${count} unread`} className={cn("rounded-full bg-[#b42318] px-2 text-xs font-bold text-white", className ?? "ml-auto")}>{count}</span> : null;
 }
 
 function Account({ user, compact, profileHref }: { user?: ShellUser; compact?: boolean; profileHref?: string }) {

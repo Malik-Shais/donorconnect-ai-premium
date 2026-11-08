@@ -1,0 +1,100 @@
+# CI for DonorConnect AI Premium. No deployment, no production credentials, no paid services.
+# Secrets: none are required. GEMINI_API_KEY is NEVER passed to pull-request jobs (all AI tests use the double-gated mock);
+# the optional live-Gemini check is manual (see docs/TESTING.md). Everything below runs on fictional, generated data.
+name: CI
+on:
+  push: { branches: [main, "feature/**"] }
+  pull_request:
+  workflow_dispatch:
+permissions: { contents: read }
+concurrency: { group: "ci-${{ github.ref }}", cancel-in-progress: true }
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Public, non-secret placeholders so `next build` works without a Supabase project (the build never contacts it).
+  NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+jobs:
+  static:
+    name: Lint, typecheck, unit tests, secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test            # DB-backed suites skip themselves without TEST_DATABASE_URL
+      - run: npm run scan:secrets
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+
+  integration:
+    name: Isolated stack, DB tests and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - run: npx playwright install --with-deps chromium
+      - name: Start the local Supabase-compatible stack (Docker Compose, generated throwaway credentials)
+        run: |
+          node scripts/stack.mjs up
+          npm run db:seed
+      - run: npm run test:db
+      - run: npm run test:e2e -- --trace off
+      - name: Stop the stack
+        if: always()
+        run: node scripts/stack.mjs down
+      - name: Upload failure report (no traces, no secrets)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report, path: test-results, retention-days: 7, if-no-files-found: ignore }
+
+  fresh-database:
+    name: Fresh-database verification (all migrations on an empty database)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: build
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'verify-fresh')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - run: npm run verify:fresh
+
+  dependencies:
+    name: Dependency and security review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - name: Fail on high/critical vulnerabilities in production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Informational full audit (dev tooling; major-version fixes are reviewed by hand, never auto-applied)
+        run: npm audit || true
+      - name: Review dependency changes in pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with: { fail-on-severity: high }

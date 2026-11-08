@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { anonLimit } from "@/lib/ratelimit";
 import { createClient } from "@/lib/supabase/server";
 import { runAssistant } from "@/lib/ai/orchestrator";
 import { getProvider } from "@/lib/ai/provider";
@@ -45,8 +46,7 @@ export async function POST(request: Request) {
 
   const safety = classifyMessage(message) !== "ok";
   if (!safety && getProvider()?.name === "gemini") { // project-wide free-tier budget guard: real Gemini calls only
-    const g = await supabase.rpc("anon_rate_limit", { p_action: "ai.global", p_subject: "global" });
-    if (g.error || (g.data as number) > 0) return json({ error: "busy", message: "The assistant is busy right now. Please try again in a few minutes." }, 503);
+    if (await anonLimit("ai.global", "global")) return json({ error: "busy", message: "The assistant is busy right now. Please try again in a few minutes." }, 503);
   }
 
   const provider = getProvider(), role = s.profile.role, ctx = { role, supabase };

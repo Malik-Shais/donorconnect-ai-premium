@@ -12,6 +12,16 @@ export const MAX_ATTEMPTS = 5;
 
 export const isLocalSmtp = (url) => ["127.0.0.1", "localhost", "::1", "[::1]"].includes(new URL(url).hostname);
 
+/** Returns an error string when the configuration is unsafe, else null. Remote SMTP needs explicit opt-in (EMAIL_ALLOW_REMOTE=1), TLS, and an https site link. */
+export function smtpPolicyError(smtpUrl, siteUrl, allowRemote) {
+  if (isLocalSmtp(smtpUrl)) return null;
+  if (allowRemote !== "1") return "Refusing to send through a non-local SMTP server (set EMAIL_ALLOW_REMOTE=1 only after explicit approval).";
+  const u = new URL(smtpUrl);
+  if (u.protocol !== "smtps:" && u.searchParams.get("requireTLS") !== "true") return "Remote SMTP must use TLS (smtps://... or ?requireTLS=true).";
+  if (!/^https:\/\//.test(siteUrl)) return "SITE_URL must be https:// when sending through a remote SMTP server.";
+  return null;
+}
+
 export function buildMessage({ to, category, siteUrl, from = "DonorConnect <noreply@donorconnect.local>" }) {
   const what = LABEL[category] ?? "a new notification", link = `${siteUrl.replace(/\/$/, "")}/notifications`;
   return {
@@ -76,9 +86,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   loadEnv(".env.worker");
   const { DATABASE_URL, EMAIL_SMTP_URL = "smtp://127.0.0.1:54325", SITE_URL = "http://localhost:3100" } = process.env;
   if (!DATABASE_URL) { console.error("DATABASE_URL missing (run `npm run db:up` to generate .env.worker)"); process.exit(1); }
-  if (!isLocalSmtp(EMAIL_SMTP_URL) && process.env.EMAIL_ALLOW_REMOTE !== "1") {
-    console.error("Refusing to send through a non-local SMTP server. Production SMTP is intentionally not configured."); process.exit(1);
-  }
+  const bad = smtpPolicyError(EMAIL_SMTP_URL, SITE_URL, process.env.EMAIL_ALLOW_REMOTE);
+  if (bad) { console.error(bad); process.exit(1); }
   const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
   const transport = nodemailer.createTransport(EMAIL_SMTP_URL);
   const run = async () => { const r = await drainQueue({ pool, transport, siteUrl: SITE_URL }); if (r.batches) console.log(new Date().toISOString(), r); };

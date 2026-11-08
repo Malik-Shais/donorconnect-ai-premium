@@ -27,6 +27,8 @@ for (const [email, full_name, role, city, blood_group] of people) {
   ids[email] = r.body.id;
 }
 // Admin is granted ONLY here, by the privileged script, never through signup.
+// Fictional accounts are marked explicitly (service role); the email domain is only a second signal. Users cannot write this column.
+for (const email of Object.keys(ids)) await call(`/rest/v1/profiles?id=eq.${ids[email]}`, { method: "PATCH", body: JSON.stringify({ is_demo: true }) });
 await call(`/rest/v1/profiles?id=eq.${ids["admin@demo.example"]}`, { method: "PATCH", body: JSON.stringify({ role: "admin" }) });
 
 const existing = await call("/rest/v1/blood_requests?select=id&limit=1");

@@ -20,7 +20,11 @@
     "email:once": "node scripts/email-worker.mjs --once",
     "email:worker": "node scripts/email-worker.mjs",
     "verify:fresh": "node scripts/verify-fresh.mjs",
-    "test:live": "DC_LIVE=1 CHROMIUM_PATH=/opt/pw-browsers/chromium playwright test live --project=desktop"
+    "test:live": "DC_LIVE=1 CHROMIUM_PATH=/opt/pw-browsers/chromium playwright test live --project=desktop",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "check": "npm run lint && npm run typecheck && npm test && npm run scan:secrets",
+    "load:test": "node scripts/load-test.mjs"
   },
   "dependencies": {
     "@google/genai": "^3.0.0",

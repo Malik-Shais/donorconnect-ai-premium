@@ -5,9 +5,10 @@ import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
 
 /** Per-request Supabase client acting AS THE SIGNED-IN USER (anon key + user JWT), so Postgres RLS applies.
  *  The service-role key is deliberately never used by the web app. */
-export async function createClient() {
+export async function createClient(headers?: Record<string, string>) {
   const store = await cookies();
   return createServerClient(supabaseUrl(), supabaseAnonKey(), {
+    ...(headers && { global: { headers } }),
     cookies: {
       getAll: () => store.getAll(),
       setAll(list) {

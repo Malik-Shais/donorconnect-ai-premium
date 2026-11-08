@@ -14,7 +14,7 @@ if (code === 0) {
   const e = Object.fromEntries(readFileSync(ENVF, "utf8").trim().split("\n").map((l) => l.split(/=(.*)/s).slice(0, 2)));
   const api = `http://127.0.0.1:${54321 + OFF}`;
   const env = { ...base, TEST_DATABASE_URL: `postgres://postgres:${e.POSTGRES_PASSWORD}@127.0.0.1:${54322 + OFF}/postgres`, NEXT_PUBLIC_SUPABASE_URL: api,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: e.SUPABASE_ANON_KEY, MAILPIT_URL: `http://127.0.0.1:${54324 + OFF}`, EMAIL_SMTP_URL: `smtp://127.0.0.1:${54325 + OFF}`, SEED_API_URL: api };
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: e.SUPABASE_ANON_KEY, MAILPIT_URL: `http://127.0.0.1:${54324 + OFF}`, EMAIL_SMTP_URL: `smtp://127.0.0.1:${54325 + OFF}`, SEED_API_URL: api, RATE_LIMIT_SECRET: e.RATE_LIMIT_SECRET };
   code = run("node", ["scripts/seed-dev.mjs"], env) || run("npx", ["vitest", "run", "tests/db"], env); // RLS + workflow + stage 4 (live WebSocket) + email + API
 }
 if (!process.argv.includes("--keep")) run("node", ["scripts/stack.mjs", "destroy"]);

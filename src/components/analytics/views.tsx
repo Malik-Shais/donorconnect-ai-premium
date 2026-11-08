@@ -16,7 +16,7 @@ const label = (t: string, bucket: string) => (bucket === "month" ? t.slice(0, 7)
 const trend = (t: Trend, bucket: string) => t.map((p) => ({ ...p, name: label(p.t, bucket) })) as Record<string, string | number>[];
 const Th = ({ children, r }: { children: React.ReactNode; r?: boolean }) => <th scope="col" className={`py-2 pr-4 ${r ? "text-right" : ""}`}>{children}</th>;
 const Table = ({ caption, head, children }: { caption: string; head: React.ReactNode; children: React.ReactNode }) => (
-  <Card className="overflow-x-auto" data-testid="history"><table className="w-full min-w-[40rem] text-left text-sm"><caption className="sr-only">{caption}</caption><thead className="text-xs uppercase tracking-wide text-muted"><tr>{head}</tr></thead><tbody className="divide-y divide-line">{children}</tbody></table></Card>
+  <Card className="overflow-x-auto" data-testid="history" role="region" aria-label={caption} tabIndex={0}><table className="w-full min-w-[40rem] text-left text-sm"><caption className="sr-only">{caption}</caption><thead className="text-xs uppercase tracking-wide text-muted"><tr>{head}</tr></thead><tbody className="divide-y divide-line">{children}</tbody></table></Card>
 );
 
 function Frame({ title, f, admin, action, error, bad, children }: { title: string; f: Filters; admin?: boolean; action: string; error?: string; bad?: string; children: React.ReactNode }) {
@@ -35,7 +35,7 @@ export async function AdminAnalytics({ sp }: { sp: SP }) {
     <Frame title="Analytics & reports" f={f} admin action={action} bad={bad}>
       {r.meta.demo_accounts > 0 && <Notice testId="demo-banner">{r.meta.scope === "real" ? "Showing real accounts only." : `Includes fictional demo data: ${r.meta.demo_accounts} of ${r.meta.all_accounts} accounts are fictional (reserved .example addresses).`}{" "}Use “Data” above to separate real from demo figures.</Notice>}
       {empty && <Notice testId="empty-state">No requests were created in this selection. Widen the date range or clear the city and blood-group filters.</Notice>}
-      <ExportLinks f={f} items={[["admin.summary", "Summary"], ["admin.trend", "Trend"], ["admin.supply_demand", "Supply vs demand"], ["admin.requests", "Requests (rows)"]]} />
+      <ExportLinks f={f} items={[["admin.summary", "Summary"], ["admin.trend", "Trend"], ["admin.supply_demand", "Supply vs demand"], ["admin.requests", "Requests (weekly aggregate)"]]} />
 
       <Section title="People" id="people"><Grid>
         <Stat testId="kpi-donors" label="Registered donors" value={r.people.donors_total} hint={`${r.people.donors_new_in_range} new in range`} />
@@ -70,7 +70,7 @@ export async function AdminAnalytics({ sp }: { sp: SP }) {
             series={[{ key: "donors", label: "Compatible available donors", color: COLORS.teal }, { key: "units", label: "Units needed", color: COLORS.burgundy }]} />
           <BarsChart title="Donors by city" note={`Cities with fewer than ${r.meta.min_group} donors are grouped as “Other”`} nameLabel="City" horizontal data={r.people.donors_by_city.map((x) => ({ name: x.city, n: x.n }))} series={[{ key: "n", label: "Donors", color: COLORS.navy }]} />
         </ChartGrid>
-        <Card className="overflow-x-auto" data-testid="supply-table"><table className="w-full min-w-[32rem] text-left text-sm"><caption className="sr-only">Preliminary supply versus demand by recipient blood group</caption>
+        <Card className="overflow-x-auto" data-testid="supply-table" role="region" aria-label="Preliminary supply versus demand by recipient blood group" tabIndex={0}><table className="w-full min-w-[32rem] text-left text-sm"><caption className="sr-only">Preliminary supply versus demand by recipient blood group</caption>
           <thead className="text-xs uppercase tracking-wide text-muted"><tr><Th>Recipient group</Th><Th r>Open requests</Th><Th r>Units needed</Th><Th r>Compatible donors</Th><Th r>Donors per unit</Th></tr></thead>
           <tbody className="divide-y divide-line">{r.supply_demand.map((x) => <tr key={x.group}><th scope="row" className="py-2 pr-4 font-medium">{x.group}</th><td className="pr-4 text-right tabular-nums">{x.demand_requests}</td><td className="pr-4 text-right tabular-nums">{x.demand_units}</td><td className="pr-4 text-right tabular-nums">{x.supply_donors}</td><td className="pr-4 text-right tabular-nums">{x.donors_per_unit ?? "—"}</td></tr>)}</tbody></table></Card>
       </Section>

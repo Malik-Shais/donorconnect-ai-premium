@@ -48,7 +48,7 @@ export function NotificationCenter({ role, prefs }: { role: string; prefs: { ema
       </nav>
 
       {loading && items.length === 0 ? (
-        <div aria-busy="true" aria-label="Loading notifications" className="grid gap-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-line/60" />)}</div>
+        <div role="status" aria-busy="true" aria-label="Loading notifications" className="grid gap-3">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-line/60" />)}</div>
       ) : shown.length === 0 ? (
         <Card><p className="py-6 text-center text-sm text-muted"><Bell className="mx-auto mb-2 size-6" aria-hidden />{items.length === 0 ? "No notifications yet. We'll let you know when something needs your attention." : "No notifications match this filter."}</p></Card>
       ) : (

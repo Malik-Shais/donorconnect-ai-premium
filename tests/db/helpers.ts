@@ -9,14 +9,15 @@ export const pool = new Pool({ connectionString: DB_URL, max: 4 });
 export type Q = <T extends QueryResultRow = QueryResultRow>(sql: string, params?: unknown[]) => Promise<T[]>;
 
 /** Run fn as `userId` (authenticated) or anonymous (null) inside one transaction. Commits on success, rolls back on error. */
-export async function as<T>(userId: string | null, fn: (q: Q) => Promise<T>): Promise<T> {
+export async function as<T>(userId: string | null, fn: (q: Q) => Promise<T>, opts: { noLimiterSecret?: boolean } = {}): Promise<T> {
   const c: PoolClient = await pool.connect();
   const q: Q = async (sql, params) => (await c.query(sql, params)).rows;
   try {
     await c.query("begin");
     await c.query(`set local role ${userId ? "authenticated" : "anon"}`);
-    await c.query("select set_config('request.jwt.claims', $1, true), set_config('request.jwt.claim.sub', $2, true)", [
+    await c.query("select set_config('request.jwt.claims', $1, true), set_config('request.jwt.claim.sub', $2, true), set_config('request.headers', $3, true)", [
       JSON.stringify({ sub: userId, role: userId ? "authenticated" : "anon" }), userId ?? "",
+      JSON.stringify(opts.noLimiterSecret || !process.env.RATE_LIMIT_SECRET ? {} : { "x-limiter-secret": process.env.RATE_LIMIT_SECRET }), // what the Next server sends
     ]);
     const out = await fn(q);
     await c.query("commit");

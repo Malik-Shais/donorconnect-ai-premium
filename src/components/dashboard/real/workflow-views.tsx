@@ -176,7 +176,7 @@ export async function AdminUsers({ me, q }: { me: string; q?: string }) {
       <Title>Users</Title>
       <p className="mb-4 text-sm text-muted">Suspending removes a person&apos;s ability to act in the app immediately. Every action is audited. Donor eligibility is managed on the <Link href="/dashboard/admin/donors" className="font-semibold text-teal underline">Eligibility</Link> page. Showing the 100 newest matches.</p>
       <Search q={q} placeholder="e.g. Ayesha" />
-      <Card className="relative overflow-x-auto">
+      <Card className="relative overflow-x-auto" role="region" aria-label="Table" tabIndex={0}>
         {rows.length ? <table className="w-full min-w-[34rem] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-muted"><tr><th className="py-2 pr-4">Name</th><th className="pr-4">Role</th><th className="pr-4">City</th><th className="pr-4">Joined</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody className="divide-y divide-line">{rows.map((u) => (
             <tr key={u.id}><td className="py-2.5 pr-4 font-medium">{u.full_name}{u.suspended && <Badge tone="critical" className="ml-2">suspended</Badge>}</td>
@@ -201,7 +201,7 @@ export async function AdminDonors({ q }: { q?: string }) {
       <Title>Donor eligibility</Title>
       <p className="mb-4 flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900"><ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden /><span><b>Record only.</b> Whether someone may donate is decided by an authorised blood service or clinician. Here you can only <b>record a decision they communicated</b>, naming the source. App administrators cannot medically clear a donor. Every entry is audited. {MEDICAL_NOTE}</span></p>
       <Search q={q} placeholder="e.g. Ayesha" />
-      <Card className="relative overflow-x-auto">
+      <Card className="relative overflow-x-auto" role="region" aria-label="Table" tabIndex={0}>
         {rows.length ? <table className="w-full min-w-[40rem] text-left text-sm"><thead className="text-xs uppercase tracking-wide text-muted"><tr><th className="py-2 pr-4">Donor</th><th className="pr-4">Group</th><th className="pr-4">Recorded status</th><th className="pr-4">Source</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody className="divide-y divide-line">{rows.map((d) => (
             <tr key={d.user_id}><td className="py-2.5 pr-4 font-medium">{d.profile?.full_name}<span className="block text-xs font-normal text-muted">{d.profile?.city}</span></td><td className="pr-4">{d.blood_group}</td>

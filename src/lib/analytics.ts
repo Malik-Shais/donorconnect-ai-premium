@@ -17,6 +17,7 @@ export const requestRows = (kind: "admin" | "mine", f: Filters, limit: number, o
   rpc<RequestRow[]>("report_requests", { p_scope_kind: kind, ...args(f), p_data_scope: f.scope, p_limit: limit, p_offset: offset });
 export const offerRows = (f: Filters, limit: number, offset: number) => rpc<OfferRow[]>("report_offers_mine", { ...args(f), p_limit: limit, p_offset: offset });
 
+type AggregateRow = { week_start: string; city: string; blood_group: string; urgency: string; status: string; requests: number; units: number };
 export const PAGE = 25, EXPORT_CAP = 10_000;
 export const KINDS = { "admin.summary": "admin", "admin.trend": "admin", "admin.supply_demand": "admin", "admin.requests": "admin", "donor.offers": "donor", "requester.requests": "requester" } as const;
 export type Kind = keyof typeof KINDS;
@@ -28,6 +29,9 @@ const statRows = (name: string, s: Stats) => [[`${name}_median_hours`, s.median_
 export async function buildCsv(kind: Kind, f: Filters): Promise<{ csv?: string; rows?: number; truncated?: boolean; error?: string }> {
   if (kind === "admin.summary" || kind === "admin.trend" || kind === "admin.supply_demand") {
     const { data: r, error } = await adminReport(f); if (error || !r) return { error: error ?? "No data" };
+    // Small-group protection for exports (the screen is for authorised admins; a file is not): a city / blood-group filter that isolates
+    // fewer than min_group requests or donors could single someone out, so it is refused.
+    if ((f.city || f.group) && (r.requests.total < r.meta.min_group || r.people.donors_total < r.meta.min_group)) return { error: `This selection is too small to export (fewer than ${r.meta.min_group} requests or donors). Widen the filters.` };
     if (kind === "admin.trend") return { csv: toCsv(["bucket_start_utc", "requests_created", "requests_approved", "requests_fulfilled"], r.trend.map((p) => [p.t, p.created, p.approved, p.fulfilled])), rows: r.trend.length };
     if (kind === "admin.supply_demand") return { csv: toCsv(["recipient_blood_group", "approved_or_matched_requests", "units_needed", "available_compatible_donors", "donors_per_unit"],
       r.supply_demand.map((x) => [x.group, x.demand_requests, x.demand_units, x.supply_donors, x.donors_per_unit])), rows: r.supply_demand.length };
@@ -51,8 +55,12 @@ export async function buildCsv(kind: Kind, f: Filters): Promise<{ csv?: string; 
     return { csv: toCsv(["offer_id", "request_id", "offered_on", "blood_group", "city", "urgency", "request_status", "origin", "offer_status", "accepted_on", "withdrawn_on", "completed"],
       data.map((o) => [o.offer_id, o.request_id, o.created_on, o.blood_group, o.city, o.urgency, o.request_status, o.origin, o.offer_status, o.accepted_on, o.withdrawn_on, o.completed])), rows: data.length, truncated: (data[0]?.total_rows ?? 0) > data.length };
   }
-  const { data, error } = await requestRows(kind === "admin.requests" ? "admin" : "mine", f, EXPORT_CAP, 0); if (error || !data) return { error: error ?? "No data" };
-  const header = ["request_id", "created_on", "blood_group", "city", "urgency", "units", "status", "hours_to_review", "hours_to_first_accept", "hours_approval_to_fulfilled", "accepted_offers", ...(kind === "admin.requests" ? ["fictional_demo_data"] : [])];
-  return { csv: toCsv(header, data.map((r) => [r.request_id, r.created_on, r.blood_group, r.city, r.urgency, r.units, r.status, r.hours_to_review, r.hours_to_first_accept, r.hours_approval_to_fulfilled, r.accepted_offers, ...(kind === "admin.requests" ? [r.is_demo] : [])])),
+  if (kind === "admin.requests") { // k-anonymous weekly aggregates: no request ids, no exact dates, small cells suppressed
+    const { data, error } = await rpc<AggregateRow[]>("report_requests_aggregate", { ...args(f), p_data_scope: f.scope, p_min: 5 }); if (error || !data) return { error: error ?? "No data" };
+    return { csv: toCsv(["week_start_utc", "city", "blood_group", "urgency", "status", "requests", "units"], data.map((x) => [x.week_start, x.city, x.blood_group, x.urgency, x.status, x.requests, x.units])), rows: data.length };
+  }
+  const { data, error } = await requestRows("mine", f, EXPORT_CAP, 0); if (error || !data) return { error: error ?? "No data" };
+  const header = ["request_id", "created_on", "blood_group", "city", "urgency", "units", "status", "hours_to_review", "hours_to_first_accept", "hours_approval_to_fulfilled", "accepted_offers"];
+  return { csv: toCsv(header, data.map((r) => [r.request_id, r.created_on, r.blood_group, r.city, r.urgency, r.units, r.status, r.hours_to_review, r.hours_to_first_accept, r.hours_approval_to_fulfilled, r.accepted_offers])),
     rows: data.length, truncated: (data[0]?.total_rows ?? 0) > data.length };
 }

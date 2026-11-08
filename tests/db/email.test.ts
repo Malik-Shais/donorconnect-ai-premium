@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import nodemailer from "nodemailer";
 import { afterAll, describe, expect, it } from "vitest";
 import { DB_URL, makeDonor, pool, root } from "./helpers";
-import { buildMessage, drainQueue, isLocalSmtp, MAX_ATTEMPTS, processBatch } from "../../scripts/email-worker.mjs";
+import { buildMessage, drainQueue, isLocalSmtp, MAX_ATTEMPTS, processBatch, smtpPolicyError } from "../../scripts/email-worker.mjs";
 
 const MAIL = process.env.MAILPIT_URL;
 if (!DB_URL || !MAIL) console.warn("\n⚠ TEST_DATABASE_URL / MAILPIT_URL not set: email tests SKIPPED (run `npm run db:up` first)\n");
@@ -117,6 +117,11 @@ d("optional email via local Mailpit", () => {
     const m = buildMessage({ to: "a@b.test", category: "invitation", siteUrl: "http://x.test/" });
     expect(m.text).toContain("a new invitation");
     expect(m.text).toContain("http://x.test/notifications");
+    expect(smtpPolicyError("smtp://127.0.0.1:54325", "http://localhost:3100", undefined)).toBeNull();
+    expect(smtpPolicyError("smtp://mail.example.org:587", "https://x.test", undefined)).toMatch(/non-local/);           // remote needs explicit opt-in
+    expect(smtpPolicyError("smtp://mail.example.org:587", "https://x.test", "1")).toMatch(/TLS/);                        // ... and TLS
+    expect(smtpPolicyError("smtp://mail.example.org:587?requireTLS=true", "http://x.test", "1")).toMatch(/https/);        // ... and an https link
+    expect(smtpPolicyError("smtps://mail.example.org:465", "https://x.test", "1")).toBeNull();
     expect(isLocalSmtp("smtp://127.0.0.1:54325")).toBe(true);
     expect(isLocalSmtp("smtp://localhost:25")).toBe(true);
     expect(isLocalSmtp("smtp://smtp.example.com:587")).toBe(false);

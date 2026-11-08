@@ -6,7 +6,7 @@
   --burgundy-dark: #5a0f23;
   --coral: #ff6b5b;
   --coral-dark: #e8503f;
-  --teal: #0e8f9b;
+  --teal: #0a7480; /* AA: 5.6:1 on white (was #0e8f9b, 3.9:1) */
   --teal-soft: #d9f1f3;
   --navy: #0f2540;
   --offwhite: #faf6f1;

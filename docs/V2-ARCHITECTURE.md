@@ -89,8 +89,15 @@ CSP: same-origin everywhere, connections only to this origin and the Supabase AP
 3. ✅ Request workflow: review queue, state machine, offers, consent, moderation, eligibility recording.
 4. ✅ Notification center, private realtime + polling fallback, preferences, rate limits, optional dev email, CSP/SW hardening.
 5. ✅ Gemini conversational assistant (server-side, read-only role-bound tools, safety layers).
-6. Advanced analytics and reports.
-7. Hardening: accessibility audit, Lighthouse PWA, CI, production email/SMTP and auth settings.
+6. ✅ Advanced analytics and reports.
+7. ✅ Hardening and deployment readiness: security review, protected demo classification, k-anonymous exports, gated rate limiter, axe + Lighthouse, load test, CI, deployment guide (nothing deployed).
 
 ## Stage 6: analytics and reporting
 See [STAGE6-ANALYTICS.md](STAGE6-ANALYTICS.md): metric definitions, denominators, missing-data rules, the read-only SQL functions, suppression thresholds, export security and tests.
+
+## Stage 7: hardening and deployment readiness
+* **Security review and findings**: [SECURITY.md](SECURITY.md). Key changes (migration `20261113000001`): `app_settings` (environment + limiter-secret hash, unreachable via the API); `anon_rate_limit` requires a server-only secret header and fails closed in production; explicit protected `profiles.is_demo` with `set_account_demo`; `report_requests_aggregate` (k-anonymous export); `plan_cache_mode = force_custom_plan` on report functions.
+* **Request path for the limiter**: Next server -> `createClient({ "x-limiter-secret": RATE_LIMIT_SECRET })` -> PostgREST -> `anon_rate_limit` compares `sha256(secret)` with `app_settings`. The public anon key alone cannot reach the counters.
+* **Operations**: `/api/health` (public, minimal), `.env.production.example`, `vercel.json`, [DEPLOYMENT.md](DEPLOYMENT.md), CI in `.github/workflows/ci.yml`, Dependabot (minor/patch only), `scripts/scan-secrets.mjs`, `scripts/load-test.mjs`.
+* **Frontend quality**: recharts is code-split and loaded when a chart nears the viewport (mobile TBT 1 199 ms -> 142 ms on the admin analytics page); WCAG fixes (contrast tokens, heading order, focusable scroll regions).
+* **Verification status**: see [TESTING.md](TESTING.md). Development-tested on the local Docker stack only; hosted Supabase/Vercel verification has not been performed.

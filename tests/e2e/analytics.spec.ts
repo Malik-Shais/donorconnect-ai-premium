@@ -28,7 +28,7 @@ test.describe("analytics", () => {
     const charts = p.getByTestId("chart"); expect(await charts.count()).toBeGreaterThanOrEqual(9);
     const status = charts.filter({ hasText: "Requests by status" });
     await expect(status.getByRole("img")).toHaveAttribute("aria-label", /data table follows/);
-    await expect(status.locator(".recharts-surface").first()).toBeVisible();
+    await status.scrollIntoViewIfNeeded(); await expect(status.locator(".recharts-surface").first()).toBeVisible();
     await status.getByText("View as data table").click();
     await expect(status.getByRole("row", { name: /Pending review\s+1/ })).toBeVisible();
     // approve, reload: the rate is now computed from the new review
@@ -82,10 +82,15 @@ test.describe("analytics", () => {
     expect(res.status()).toBe(200); expect(res.headers()["content-type"]).toContain("text/csv"); expect(res.headers()["content-disposition"]).toMatch(/attachment; filename="donorconnect-admin-requests-\d{4}-\d{2}-\d{2}_/);
     expect(res.headers()["cache-control"]).toContain("no-store"); expect(res.headers()["x-content-type-options"]).toBe("nosniff");
     const csv = await res.text();
-    expect(csv.replace("﻿", "").split("\r\n")[0]).toBe("request_id,created_on,blood_group,city,urgency,units,status,hours_to_review,hours_to_first_accept,hours_approval_to_fulfilled,accepted_offers,fictional_demo_data");
-    expect(csv).toContain("'=cmd|' /C calc'!A0");                                                  // neutralised with a leading apostrophe
-    expect(csv).not.toMatch(/(^|,)[=+@]/m); expect(csv).not.toMatch(/(^|,)-[A-Za-z]/m);
-    for (const secret of [s.hospital, "Patient", "@test.example", "Test Person"]) expect(csv).not.toContain(secret);
+    expect(csv.replace(/^\uFEFF/, "").split("\r\n")[0]).toBe("week_start_utc,city,blood_group,urgency,status,requests,units");   // k-anonymous weekly aggregate: no ids, no exact dates
+    for (const r of csv.trim().split("\r\n").slice(1)) { const [week, , , , , n] = r.split(","); expect(week === "(suppressed)" || /^\d{4}-\d{2}-\d{2}$/.test(week)).toBe(true); if (week !== "(suppressed)") expect(Number(n)).toBeGreaterThanOrEqual(5); }
+    expect(csv).not.toMatch(/(^|,)[=+@]/m);                                                       // a hostile city may form a legitimate large cell from earlier runs: it must be neutralised
+    for (const secret of [s.hospital, "Patient", "@test.example", "Test Person", s.city]) expect(csv).not.toContain(secret);
+    // formula injection: a requester's OWN export shows their city verbatim, so the hostile value must be neutralised there
+    const own = await (await s.rq.page.request.get("/api/reports/requester.requests")).text();
+    expect(own).toContain("'=cmd|' /C calc'!A0"); expect(own).not.toMatch(/(^|,)[=+@]/m);
+    const small = await p.request.get(`/api/reports/admin.summary?city=${s.city}&from=2026-01-01&to=2026-12-31`);   // a tiny filtered selection cannot be exported
+    expect(small.status()).toBe(400); expect((await small.json()).error).toMatch(/too small to export/);
     const sum = await p.request.get("/api/reports/admin.summary?from=2026-01-01&to=2026-12-31&scope=all"); expect(sum.status()).toBe(200);
     expect(await sum.text()).toContain("approval_rate,"); expect(await (await p.request.get("/api/reports/admin.trend")).text()).toContain("bucket_start_utc,requests_created");
     expect(await (await p.request.get("/api/reports/admin.supply_demand")).text()).toContain("donors_per_unit");

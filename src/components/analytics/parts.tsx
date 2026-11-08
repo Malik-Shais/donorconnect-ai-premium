@@ -64,7 +64,7 @@ export function ExportLinks({ items, f }: { items: [string, string][]; f: Filter
   return (
     <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="exports"><span className="text-sm font-semibold text-navy">Download CSV:</span>
       {items.map(([kind, label]) => <a key={kind} href={`/api/reports/${kind}?${filterQuery(f)}`} download className="inline-flex min-h-11 items-center rounded-full border-[1.5px] border-line bg-white px-4 text-sm font-semibold text-navy hover:bg-offwhite">{label}</a>)}
-      <span className="text-xs text-muted">Aggregates and de-identified rows only; every export is logged.</span></div>
+      <span className="text-xs text-muted">Aggregates and de-identified rows only; small groups are suppressed; every export is logged.</span></div>
   );
 }
 
