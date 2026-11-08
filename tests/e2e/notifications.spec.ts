@@ -185,7 +185,7 @@ test.describe("privacy and security headers", () => {
     await donor.page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error("CSPVIOLATION " + e.violatedDirective + " " + e.blockedURI)));
     donor.page.on("console", (m) => { if (m.type() === "error" && /CSPVIOLATION|Content Security Policy/i.test(m.text())) problems.push(m.text()); });
     donor.page.on("pageerror", (e) => problems.push(e.message));
-    for (const path of ["/dashboard/donor", "/dashboard/donor/opportunities", "/dashboard/donor/notifications", "/dashboard/donor/profile"]) {
+    for (const path of ["/dashboard/donor", "/dashboard/donor/opportunities", "/dashboard/donor/profile", "/dashboard/donor/notifications"]) {
       const r = await donor.page.goto(path); await donor.page.waitForTimeout(800);
       const h = r!.headers();
       expect(h["cache-control"]).toMatch(/no-store/);

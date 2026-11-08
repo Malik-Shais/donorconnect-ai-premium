@@ -6,7 +6,7 @@ import { requireSession } from "@/lib/auth";
 import type { FormState } from "@/lib/validation";
 
 const id = z.coerce.number().int().positive();
-export const CATEGORIES = ["request", "offer", "invitation", "review", "account"] as const;
+const CATEGORIES = ["request", "offer", "invitation", "review", "account"] as const;
 
 export async function markNotificationReadAction(raw: number): Promise<{ ok: boolean }> {
   const s = await requireSession();
