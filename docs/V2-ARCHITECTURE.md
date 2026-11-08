@@ -64,11 +64,30 @@ In-app is the default. A user may opt in per category (`notification_preferences
 ### Browser hardening
 CSP: same-origin everywhere, connections only to this origin and the Supabase API/Realtime, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri`/`form-action` self. `script-src` keeps `'unsafe-inline'` (Next injects inline bootstrap scripts; nonces would force fully dynamic rendering); no `unsafe-eval` in production. Also HSTS, COOP, nosniff, frame deny. Every private route is `Cache-Control: no-store`. The service worker (`dc-v2`) caches only an allowlist of static build assets and the offline page; navigations, RSC, API and auth requests are never cached.
 
+## Stage 5: Gemini AI assistant
+
+**Request path.** Browser → `POST /api/ai/chat` (same-origin, JSON, ≤30 KB, session cookie) → `getSession()` (suspended users refused) → PostgreSQL `check_rate_limit('ai.chat')` (20/hour/user, 429) → for real Gemini calls only, the project-wide `ai.global` budget (200/hour, tune in `rate_limit_rules`) → `runAssistant()` → provider (`@google/genai`, key read only in `src/lib/ai/provider.ts`) → NDJSON stream back. Nothing is stored server-side; the conversation lives in that browser's `localStorage`, keyed by user id.
+
+**Safety layers (all outside the model, so a jailbroken model cannot skip them):**
+1. *Input classifier* (`safety.ts`): emergencies and personal medical-decision questions (eligibility, diagnosis, treatment, transfusion need/compatibility) are answered with fixed text and **never sent to Gemini**.
+2. *Prompt construction* (`prompt.ts`): fixed system rules; browser-supplied history is forgeable, so it is placed in the **user** turn as a labelled untrusted transcript, never as a system/model turn.
+3. *Tools* (`tools.ts`): five read-only tools bound to roles (donor: opportunities, offers; requester: own requests; admin: aggregate counts; all: help text, unread counts). They run with the **signed-in user's Supabase client**, so RLS decides visibility; no service key, no SQL from the model. The executor re-checks the role for every call and refuses unknown names. Fields are whitelisted and free text is clamped; patient labels, hospitals, names, phones, emails and notes never enter the model context. Tool output is wrapped as `untrusted_data`.
+4. *Output guard*: streaming redaction of emails, phone-like numbers and UUIDs (hold-back window, never cuts inside a possible phone number), and a policy check that replaces answers claiming eligibility/safety or claiming to have approved, invited or shared something.
+5. *Rendering* (`rich-text.tsx`): React elements only; the sole supported markup is bold and internal `/dashboard/...` links.
+
+**Errors.** Provider failures map to a small vocabulary (`quota`, `unavailable`, `auth`, `not_configured`); raw SDK messages are never shown. Output is capped (700 tokens, 3 tool rounds, 4 calls per round).
+
+**Model.** `GEMINI_MODEL`, default `gemini-3.8-flash` (named in the `@google/genai` 3.0.0 documentation). The Google docs site and the model list were unreachable from the build sandbox, so availability of that id for a given key is **not verified**; change the variable if the API reports it unavailable.
+
+**Mock vs live.** Automated tests use a deterministic mock provider that requires *both* `AI_PROVIDER=mock` and `DC_ALLOW_AI_MOCK=1` (set only by `playwright.config.ts`). It can simulate a compromised model, quota errors and slow streams. `tests/live/gemini.live.spec.ts` is the only live-Gemini test; it needs `GEMINI_API_KEY` and `DC_LIVE=1` (`npm run test:live`) and is skipped otherwise.
+
+**Threat notes.** Residual risks: the classifier is regex-based (misses paraphrases, may over-trigger), so the model is also instructed to refuse and its output is checked; a model could still give wrong *general* information; free-tier quota is shared project-wide by design.
+
 ## Roadmap
 1. ✅ Foundation, design system, landing, shell, PWA.
 2. ✅ Supabase-compatible stack, migrations, RLS, Auth, guarded dashboards.
 3. ✅ Request workflow: review queue, state machine, offers, consent, moderation, eligibility recording.
 4. ✅ Notification center, private realtime + polling fallback, preferences, rate limits, optional dev email, CSP/SW hardening.
-5. Gemini conversational agent (server-side).
+5. ✅ Gemini conversational assistant (server-side, read-only role-bound tools, safety layers).
 6. Advanced analytics and reports.
 7. Hardening: accessibility audit, Lighthouse PWA, CI, production email/SMTP and auth settings.

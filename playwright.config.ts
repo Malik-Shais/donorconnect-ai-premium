@@ -4,10 +4,13 @@ import { config } from "dotenv";
 config({ path: ".env.local", quiet: true }); config({ path: ".env.test.local", quiet: true }); // MAILPIT_URL etc. for the real-stack auth tests
 const launchOptions = { executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--no-sandbox"] };
 export default defineConfig({
-  testDir: "tests/e2e",
+  testDir: "tests",
+  testMatch: ["e2e/**/*.spec.ts", "live/**/*.live.spec.ts"],
   globalSetup: "./tests/e2e/global-setup.ts",
   workers: 2,
-  webServer: { command: "npm run start -- -p 3100", url: "http://localhost:3100", reuseExistingServer: true, timeout: 60_000 },
+  webServer: { command: "npm run start -- -p 3100", url: "http://localhost:3100", reuseExistingServer: true, timeout: 60_000,
+    // MOCK Gemini for automated tests (needs BOTH flags). Live Gemini is verified separately by tests/live/gemini.live.spec.ts.
+    env: process.env.DC_LIVE ? {} : { AI_PROVIDER: "mock", DC_ALLOW_AI_MOCK: "1" } },
   use: { baseURL: "http://localhost:3100", trace: "off" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], launchOptions } },

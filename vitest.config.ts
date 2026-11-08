@@ -8,10 +8,10 @@ const pickEnv = () => Object.fromEntries(KEYS.filter((k) => process.env[k]).map(
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  resolve: { alias: { "@": path.resolve(__dirname, "src"), "server-only": path.resolve(__dirname, "tests/ai/stub-server-only.ts") } },
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}", "tests/db/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "tests/db/**/*.test.ts", "tests/ai/**/*.test.ts"],
     globalSetup: ["tests/db/global-setup.ts"],
     env: { ...loadEnv("test", process.cwd(), ""), ...pickEnv() }, // .env.local by default; explicitly exported variables win (used to verify an isolated stack)
     fileParallelism: false, // DB tests share one database

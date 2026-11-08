@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { NewRequestView, NotificationsPage, OpportunitiesView, ProfileView, RequestsView, Title } from "@/components/dashboard/real/views";
 import { AdminDonors, AdminRequestsList, AdminReviewQueue, AdminUsers, DonorOffers } from "@/components/dashboard/real/workflow-views";
+import { AssistantChat } from "@/components/assistant/chat";
 import { requireRole } from "@/lib/auth";
 import { isRole, NAV } from "@/lib/nav";
 
@@ -13,6 +14,7 @@ export default async function Section({ params, searchParams }: PageProps<"/dash
   if (!isRole(role) || !item) notFound();
   const s = await requireRole(role); // authorization is verified here, not only in the layout
 
+  if (section === "assistant") return (<><Title>AI assistant</Title><AssistantChat role={role} userId={s.profile.id} /></>);
   if (section === "profile") return <ProfileView s={s} />;
   if (section === "notifications") return <NotificationsPage role={role} />;
   if (role === "donor" && section === "opportunities") return <OpportunitiesView s={s} group={one("group")} city={one("city")} />;
