@@ -1,10 +1,18 @@
 // Stage 4 browser tests: notification center, LIVE realtime (real WebSocket), polling fallback, reconnect, email via Mailpit,
 // UI rate limits, service-worker privacy and security headers. Requires `npm run db:up && npm run db:seed`.
 import { execFileSync } from "node:child_process";
+import { Client } from "pg";
 import { expect, test, type Page } from "@playwright/test";
 import { adminApprove, newAdmin, newUser, register, stamp, submitRequest, uniq } from "./helpers";
 
 const MAIL = process.env.MAILPIT_URL;
+/** On failure, show what the outbox says about this recipient (status/attempts/error CODE only), so a flake is diagnosable. */
+async function outboxState(email: string) {
+  if (!process.env.TEST_DATABASE_URL) return "no TEST_DATABASE_URL";
+  const c = new Client({ connectionString: process.env.TEST_DATABASE_URL }); await c.connect();
+  try { return JSON.stringify((await c.query("select o.status, o.attempts, o.last_error, o.next_attempt_at > now() as backed_off from public.email_outbox o join auth.users u on u.id=o.user_id where u.email=$1", [email.toLowerCase()])).rows); }
+  finally { await c.end(); }
+}
 const status = (p: Page) => p.getByTestId("live-status");
 const badge = (p: Page) => p.locator('[data-testid="unread-badge"]:visible');
 const donorIn = (browser: Parameters<typeof newUser>[0], city: string, tag: string) => newUser(browser, { email: uniq(tag), name: `Dee ${tag}`, city, group: "O+" });
@@ -120,7 +128,8 @@ test.describe("optional email (local Mailpit only)", () => {
     const { hospital } = await publishRequest(browser, admin.page, city, s);
     execFileSync("node", ["scripts/email-worker.mjs", "--once"], { stdio: "pipe" });
     let msgs: { ID: string }[] = [];
-    await expect.poll(async () => { msgs = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages ?? []; return msgs.length; }, { timeout: 15_000 }).toBe(1);
+    await expect.poll(async () => { msgs = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages ?? []; return msgs.length; },
+      { timeout: 15_000, message: `email not delivered once. outbox=${await outboxState(email)}` }).toBe(1);
     const msg = await (await fetch(`${MAIL}/api/v1/message/${msgs[0].ID}`)).json();
     expect(msg.Subject).toBe("DonorConnect: you have a new notification");
     expect(`${msg.Text}${msg.HTML}`).toContain("/notifications");
