@@ -38,10 +38,9 @@ test.describe("notification center", () => {
     await expect(donor.page.getByTestId("unread-summary")).toHaveText("1 unread");
     await donor.page.getByRole("button", { name: /^Unread/ }).click();
     await expect(donor.page.getByText("Welcome to DonorConnect AI")).toBeVisible(); // the remaining unread one
-    await donor.page.getByRole("button", { name: "Requests", exact: true }).click();
-    await expect(donor.page.getByText("No notifications match this filter.")).toBeVisible(); // filtered-empty state
     await donor.page.getByRole("button", { name: "Mark all as read" }).click();
     await expect(donor.page.getByTestId("unread-summary")).toHaveText("You're all caught up.");
+    await expect(donor.page.getByText("No notifications match this filter.")).toBeVisible(); // Unread filter is now empty
     await expect(badge(donor.page)).toHaveCount(0);
     await donor.page.reload(); // persisted server-side
     await expect(donor.page.getByTestId("unread-summary")).toHaveText("You're all caught up.");

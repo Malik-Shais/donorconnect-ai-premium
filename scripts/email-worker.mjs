@@ -46,7 +46,7 @@ export async function processBatch({ pool, transport, siteUrl, batch = 20 }) {
         // Only an error CODE is stored, never the message (SMTP errors can echo the recipient address).
         await c.query("update public.email_outbox set attempts=$2, status=$3, last_error=$4, next_attempt_at = now() + make_interval(mins => $5) where id=$1",
           [r.id, attempts, dead ? "failed" : "pending", String(e?.code ?? "SEND_FAILED").slice(0, 40), 2 ** attempts]);
-        dead ? out.failed++ : out.retried++;
+        if (dead) out.failed++; else out.retried++;
       }
     }
     await c.query("commit");

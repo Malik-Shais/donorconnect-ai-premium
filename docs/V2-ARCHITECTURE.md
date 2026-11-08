@@ -44,11 +44,31 @@ Preliminary ABO/Rh red-cell compatibility (`blood_compat`, mirrored and tested a
 ## Eligibility
 Medical eligibility is decided by authorised blood services, not by this app. `set_donor_eligibility` only **records** a decision with a mandatory named source, the recording admin and a timestamp (audited). `deferred` removes a donor from matching; no interval is hard-coded.
 
+## Stage 4: notifications, realtime, rate limits, email, hardening
+
+### Realtime (Supabase Realtime, self-hosted in the Docker stack, no paid service)
+- **Design: private per-user broadcast channel, ids only.** A trigger on `notifications` calls `realtime.send({notification_id}, 'notification', 'notif:<user_id>', private => true)`. The payload never contains message text, request/patient/requester data or contact details. The browser treats it as a *hint* and re-reads `/api/notifications`, which re-authorizes through RLS.
+- **Authorization (default deny).** `realtime.messages` has RLS and exactly one policy, `notif_topic_receive` (SELECT, `authenticated`). It requires BOTH (1) the joined topic equals `'notif:' || auth.uid()` where `auth.uid()` comes from the signature-verified JWT, never from a client-supplied value, AND (2) the **row's own topic equals that same session topic**. There is no insert/update/delete policy, so writes are denied; only the SECURITY DEFINER trigger publishes. The dev stack also revokes write grants (as `supabase_admin`, the grantor) and `anon` SELECT.
+- **Why the row check matters.** The first version only compared the session topic with the user id. A session that merely *claimed* its own topic could then read every row at the SQL level. It was not reachable through the public API (PostgREST exposes only `public`), but it violated default-deny. It is fixed and covered by a test that fails against the old policy.
+- **Replaced design.** An earlier `postgres_changes` approach was dropped: unauthorized anon subscribers still received empty `401` frames whenever anyone got a notification (an activity-timing side channel). Private channels deny the join outright.
+- **Token trade-off.** The session cookie is HttpOnly, but joining the socket needs the user's access token, so `/api/notifications/realtime` returns the caller's own short-lived token (`no-store`, authenticated). A script running in the page could read it; the CSP limits that exposure and RLS bounds what it can do.
+- **Client behaviour.** Connect, catch-up refresh on every (re)subscribe, exponential-backoff reconnect (3 s doubling to 60 s), token renewal at 50 min, `online`/`offline` handling, focus/visibility refresh, and a 20 s polling fallback whenever the socket is not live (120 s safety net while live).
+
+### Rate limiting (PostgreSQL, persistent, multi-process safe)
+`rate_limits` holds fixed-window counters updated by one atomic `INSERT ... ON CONFLICT DO UPDATE`; concurrent callers cannot both slip under a limit (tested with 40 simultaneous calls). Limits are defined in `rate_limit_rules`, not by clients. Authenticated limits are enforced **inside the database** (triggers on request/offer creation; wrappers around `invite_donors`, `review_request`, `set_contact_consent`, `owner_request_offers` i.e. contact disclosure) so direct API calls cannot bypass them. Unauthenticated flows (login, register, password reset) use `anon_rate_limit` keyed by a SHA-256 hash of the email plus a global ceiling; **client IP headers are not trusted** (spoofable). Login counts only failed attempts. Errors say how long to wait (`PT429` -> HTTP 429). `check_rate_limit('ai.chat')` exists for the future AI endpoint.
+Known limits: an attacker can burn a victim's per-email login/reset quota (standard lockout trade-off); without a trusted proxy there is no per-IP limit; counters are fixed windows (a burst can straddle a boundary).
+
+### Email (optional, opt-in, development-only)
+In-app is the default. A user may opt in per category (`notification_preferences`). A trigger queues rows in the private `email_outbox`; `scripts/email-worker.mjs` drains it (`FOR UPDATE SKIP LOCKED`, exponential backoff, dead-letter after 5 attempts, opt-out re-checked at send time, only an error *code* stored). Emails are generic: no patient, hospital, request or contact data, only a link to `/notifications`. The worker **refuses any non-local SMTP host** unless `EMAIL_ALLOW_REMOTE=1`; production SMTP is intentionally unconfigured. Delivery is at-least-once.
+
+### Browser hardening
+CSP: same-origin everywhere, connections only to this origin and the Supabase API/Realtime, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri`/`form-action` self. `script-src` keeps `'unsafe-inline'` (Next injects inline bootstrap scripts; nonces would force fully dynamic rendering); no `unsafe-eval` in production. Also HSTS, COOP, nosniff, frame deny. Every private route is `Cache-Control: no-store`. The service worker (`dc-v2`) caches only an allowlist of static build assets and the offline page; navigations, RSC, API and auth requests are never cached.
+
 ## Roadmap
 1. ✅ Foundation, design system, landing, shell, PWA.
 2. ✅ Supabase-compatible stack, migrations, RLS, Auth, guarded dashboards.
-3. ✅ Request workflow: review queue, state machine, offers, consent, moderation, eligibility recording, notifications.
-4. Realtime notifications, rate limiting, email delivery.
+3. ✅ Request workflow: review queue, state machine, offers, consent, moderation, eligibility recording.
+4. ✅ Notification center, private realtime + polling fallback, preferences, rate limits, optional dev email, CSP/SW hardening.
 5. Gemini conversational agent (server-side).
 6. Advanced analytics and reports.
-7. Hardening: accessibility audit, Lighthouse PWA, CI.
+7. Hardening: accessibility audit, Lighthouse PWA, CI, production email/SMTP and auth settings.

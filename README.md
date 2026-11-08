@@ -4,16 +4,18 @@ Blood donor coordination platform. **Next.js 16 (App Router) · React 19 · Type
 
 > Matching is preliminary. The app never diagnoses, never makes transfusion decisions and never decides donor eligibility. Eligibility is a status recorded by authorised staff; **no donation interval is hard-coded anywhere.**
 
-## Status: Stage 3 (request workflows)
+## Status: Stage 4 (notifications, realtime, rate limits)
 | Area | State |
 |---|---|
 | Landing, design system, PWA, demo mode (`/demo/*`) | done |
-| PostgreSQL schema, 6 versioned migrations, RLS, audit log | **done, tested against real PostgreSQL** |
-| Register / login / logout / sessions / password recovery | **done, tested in a real browser** |
-| **Requester**: 3-step request wizard, status + timeline, anonymous invitations, consented contact display, cancel / fulfil | **done, tested** |
-| **Admin**: review queue (verification method, audited decisions), request management + full history/audit, moderation cancel, user suspension, **recording** of blood-service eligibility decisions | **done, tested** |
-| **Donor**: filtered preliminary opportunities, accept/decline invitations, offers manager, revocable contact consent, notification preference | **done, tested** |
-| Realtime, rate limiting, Gemini AI, advanced analytics | **not started** (Stage 4+) |
+| PostgreSQL schema, 7 versioned migrations, RLS, audit log | **done, tested against real PostgreSQL** |
+| Auth, request workflows (requester / admin / donor), consent, eligibility recording | **done, tested** |
+| **Notification center**: unread counters, categories, filters, timestamps, links, mark-as-read / mark-all, empty / loading / offline / error states | **done, tested** |
+| **Realtime** (self-hosted Supabase Realtime): private per-user channel, ids-only payload, strict per-user authorization, reconnect + catch-up, polling fallback | **done, tested live over a real WebSocket** |
+| **Persistent rate limiting** (PostgreSQL atomic counters; auth flows, request creation, invitations, contact disclosure, AI-ready) | **done, tested incl. concurrency** |
+| **Optional email** (opt-in, generic content, local Mailpit only; production SMTP NOT configured) | **done, tested via Mailpit** |
+| CSP + security headers, `no-store` private routes, service-worker cache audit | **done, tested** |
+| Gemini AI, advanced analytics | **not started** (Stages 5-6) |
 
 ### Request lifecycle
 `pending_review` → (`approved` | `rejected`) by an admin; `approved` ⇄ `matched` automatically as donors accept/withdraw; `matched` → `fulfilled` by the requester; `cancelled` by the requester or (with a note) an admin. `rejected`/`fulfilled`/`cancelled` are terminal. Donors never see or hear about a request before it is approved. Full table and rules: [`docs/V2-ARCHITECTURE.md`](docs/V2-ARCHITECTURE.md).
@@ -50,19 +52,22 @@ Roles live in `public.profiles.role`, writable only by the database owner/servic
 
 ## Tests
 ```bash
-npm test            # Vitest: unit/validation + 26 SQL/RLS + 23 workflow (incl. 3 concurrency races) + 7 live HTTP API tests
+npm test            # Vitest: unit + 26 RLS + 23 workflow + 13 stage-4 (incl. LIVE realtime WebSocket) + 6 email via Mailpit + 7 live HTTP API
 npm run test:e2e    # builds, then Playwright on desktop + Pixel 7 (needs `npm run db:up && npm run db:seed`)
 npm run lint && npm run typecheck
+npm run email:once  # optional: send queued opt-in emails through local Mailpit (http://127.0.0.1:54324)
 ```
-DB/API tests **skip with a visible warning** when the stack isn't running; they never fall back to mocks. Security tests were mutation-checked (deliberately weakening a grant, a trigger or `is_admin()` makes specific tests fail).
+DB/API/realtime/email tests **skip with a visible warning** when the stack isn't running; they never fall back to mocks.
 
-**Verified live on the local Docker stack (real Supabase Postgres, GoTrue, PostgREST, Mailpit):** migrations from an empty database; the full requester → admin review → donor offer → consent → revoke → re-consent → fulfil journey; rejection; cancellation (requester and admin moderation); anonymous invitations; withdrawal; eligibility recording; suspension; cross-user access; forged/escalating requests (role change, `approved` insert, direct status patch, forged JWT); concurrent accepts and concurrent approve/reject; responsive layouts at 360/390/768/1280 px.
+### Verification status (local Docker stack: real Supabase Postgres, GoTrue, PostgREST, **Realtime**, Mailpit)
+RESULTS_BLOCK
 
-### Not verified / not done (be aware)
-- **No hosted Supabase project** was used; nothing was run against supabase.com. The official `supabase` CLI was not run (binary download blocked in the build sandbox).
-- Local dev auto-confirms emails (`GOTRUE_MAILER_AUTOCONFIRM=true`); **production must require email confirmation** and real SMTP. No email delivery of notifications (in-app only).
-- No app-level rate limiting (GoTrue limits only), no CSP (basic security headers), no screen-reader or Lighthouse audit, no Realtime, no pagination beyond the newest 100 users/donors (search is provided).
-- Admin analytics are live counts only; charts/reports arrive later.
+### NOT TESTED / not done (be aware)
+- **No hosted Supabase project** was used; the official `supabase` CLI was not run (binary download blocked in the build sandbox).
+- The final Stage 4 migration text was applied incrementally to the dev database; it was not re-run from an empty database after the last policy edit (the earlier fresh-install run used an older policy revision).
+- **Production** email confirmation / SMTP, TLS-terminated deployment (HSTS is sent but untested over HTTPS), per-IP rate limiting behind a trusted proxy, screen-reader and Lighthouse audits, load/soak testing of Realtime.
+- Realtime reconnect was tested via browser offline/online and a blocked WebSocket, not via killing the Realtime server mid-session.
+- Email delivery is at-least-once (a crash between SMTP accept and commit could resend one message).
 
 ## Using a hosted Supabase project (untested here)
 1. Create a free project; in SQL editor run the files in `supabase/migrations/` in order (or `supabase db push`).
