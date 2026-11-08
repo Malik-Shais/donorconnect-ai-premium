@@ -4,15 +4,17 @@ import { randomUUID } from "node:crypto";
 import nodemailer from "nodemailer";
 import { afterAll, describe, expect, it } from "vitest";
 import { DB_URL, makeDonor, pool, root } from "./helpers";
-import { buildMessage, isLocalSmtp, MAX_ATTEMPTS, processBatch } from "../../scripts/email-worker.mjs";
+import { buildMessage, drainQueue, isLocalSmtp, MAX_ATTEMPTS, processBatch } from "../../scripts/email-worker.mjs";
 
 const MAIL = process.env.MAILPIT_URL;
 if (!DB_URL || !MAIL) console.warn("\n⚠ TEST_DATABASE_URL / MAILPIT_URL not set: email tests SKIPPED (run `npm run db:up` first)\n");
 const d = DB_URL && MAIL ? describe : describe.skip;
-afterAll(() => pool.end());
+const optedIn: string[] = [];
+// Leave no opted-in users behind: the database is shared, and other suites invite/notify arbitrary compatible donors.
+afterAll(async () => { if (optedIn.length) await root("update public.notification_preferences set email_enabled=false where user_id = any($1)", [optedIn]); await pool.end(); });
 
 const SITE = "http://localhost:3100";
-const smtp = nodemailer.createTransport("smtp://127.0.0.1:54325");
+const smtp = nodemailer.createTransport(process.env.EMAIL_SMTP_URL ?? "smtp://127.0.0.1:54325");
 const run = (transport: unknown = smtp, batch = 50) => processBatch({ pool, transport, siteUrl: SITE, batch }) as Promise<{ sent: number; skipped: number; retried: number; failed: number }>;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const emailOf = async (id: string) => (await root<{ email: string }>("select email from auth.users where id=$1", [id]))[0].email;
@@ -21,11 +23,11 @@ const inbox = async (addr: string) => {
   const found = await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${addr}`)}`)).json();
   return Promise.all((found.messages ?? []).map(async (m: { ID: string }) => (await fetch(`${MAIL}/api/v1/message/${m.ID}`)).json()));
 };
-const optIn = (id: string, cats = "array['request','offer','invitation']") => root(`insert into public.notification_preferences (user_id, email_enabled, email_categories) values ($1, true, ${cats})`, [id]);
+const optIn = (id: string, cats = "array['request','offer','invitation']") => (optedIn.push(id), root(`insert into public.notification_preferences (user_id, email_enabled, email_categories) values ($1, true, ${cats})`, [id]));
 const notify = (id: string, key: string, msg = "x") => root("insert into public.notifications (user_id, message, dedupe_key) values ($1,$2,$3) returning id", [id, msg, key]);
 const outbox = async (id: string) => (await root<{ status: string; attempts: number; last_error: string | null; next_attempt_at: Date }>("select status, attempts, last_error, next_attempt_at from public.email_outbox where user_id=$1 order by id", [id]));
 // drain anything queued by other tests so counts below are exact
-const drain = () => run(smtp, 500);
+const drain = () => drainQueue({ pool, transport: smtp, siteUrl: SITE }); // the whole queue, however large
 
 d("optional email via local Mailpit", () => {
   it("an opted-in user gets ONE generic email; sensitive notification text never leaves the app", async () => {
@@ -98,6 +100,17 @@ d("optional email via local Mailpit", () => {
     expect(results.reduce((n, r) => n + r.sent, 0)).toBeLessThanOrEqual(6);
     for (const u of users) expect(await inbox(await emailOf(u))).toHaveLength(1);
     for (const u of users) expect((await outbox(u))[0]).toMatchObject({ status: "sent", attempts: 1 });
+  });
+
+  it("a backlog larger than one batch is fully drained in a single run (the e2e flake's root cause)", async () => {
+    await drain();
+    const users = await Promise.all(Array.from({ length: 5 }, () => makeDonor()));
+    for (const u of users) { await optIn(u); await notify(u, `req:${randomUUID().slice(0, 6)}:b`); }
+    const r = await drainQueue({ pool, transport: smtp, siteUrl: SITE, batch: 2 }); // batch smaller than the queue
+    expect(r.sent).toBe(5);
+    expect(r.batches).toBeGreaterThanOrEqual(3);
+    for (const u of users) expect((await outbox(u))[0].status).toBe("sent");
+    expect((await drainQueue({ pool, transport: smtp, siteUrl: SITE, batch: 2 })).batches).toBe(0); // nothing left
   });
 
   it("content builder and SMTP guard: generic text only, local hosts only", () => {

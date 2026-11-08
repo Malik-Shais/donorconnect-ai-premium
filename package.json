@@ -18,7 +18,8 @@
     "db:seed": "node scripts/seed-dev.mjs",
     "test:db": "vitest run tests/db",
     "email:once": "node scripts/email-worker.mjs --once",
-    "email:worker": "node scripts/email-worker.mjs"
+    "email:worker": "node scripts/email-worker.mjs",
+    "verify:fresh": "node scripts/verify-fresh.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",

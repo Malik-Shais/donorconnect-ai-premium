@@ -54,6 +54,19 @@ export async function processBatch({ pool, transport, siteUrl, batch = 20 }) {
   return out;
 }
 
+/** Drains the WHOLE due queue (batch after batch) so "process the queue" is deterministic regardless of backlog size.
+ *  Terminates when a batch touches no rows; rows that fail are rescheduled into the future so they cannot loop. */
+export async function drainQueue({ pool, transport, siteUrl, batch = 20, maxBatches = 500 }) {
+  const total = { sent: 0, skipped: 0, retried: 0, failed: 0, batches: 0 };
+  for (let i = 0; i < maxBatches; i++) {
+    const r = await processBatch({ pool, transport, siteUrl, batch });
+    const n = r.sent + r.skipped + r.retried + r.failed;
+    if (n === 0) break;
+    total.sent += r.sent; total.skipped += r.skipped; total.retried += r.retried; total.failed += r.failed; total.batches++;
+  }
+  return total;
+}
+
 function loadEnv(file) {
   if (!existsSync(file)) return;
   for (const l of readFileSync(file, "utf8").split("\n")) { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]; }
@@ -68,7 +81,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
   const transport = nodemailer.createTransport(EMAIL_SMTP_URL);
-  const run = async () => { const r = await processBatch({ pool, transport, siteUrl: SITE_URL }); if (r.sent + r.skipped + r.retried + r.failed) console.log(new Date().toISOString(), r); };
+  const run = async () => { const r = await drainQueue({ pool, transport, siteUrl: SITE_URL }); if (r.batches) console.log(new Date().toISOString(), r); };
   if (process.argv.includes("--once")) { await run(); await pool.end(); }
   else { console.log("email worker running (local SMTP only)"); for (;;) { await run().catch((e) => console.error("batch failed:", e.code ?? e.message)); await new Promise((r) => setTimeout(r, 10_000)); } }
 }

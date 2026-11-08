@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 
 const parse = (f) => Object.fromEntries(readFileSync(f, "utf8").split("\n").filter((l) => l && !l.startsWith("#")).map((l) => l.split(/=(.*)/s).slice(0, 2)));
-const URL_ = parse(".env.local").NEXT_PUBLIC_SUPABASE_URL, KEY = parse("supabase/.env.dev").SUPABASE_SERVICE_ROLE_KEY; // service key lives only in supabase/.env.dev
+const URL_ = process.env.SEED_API_URL ?? parse(".env.local").NEXT_PUBLIC_SUPABASE_URL, KEY = parse(process.env.DC_ENV_FILE ?? "supabase/.env.dev").SUPABASE_SERVICE_ROLE_KEY; // service key lives only in the git-ignored stack env file
 if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(URL_ ?? "")) { console.error(`Refusing to seed non-local target: ${URL_}`); process.exit(1); }
 const PASSWORD = "Demo@12345"; // fictional dev-only credential, documented in the README
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };

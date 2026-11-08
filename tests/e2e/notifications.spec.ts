@@ -6,12 +6,30 @@ import { expect, test, type Page } from "@playwright/test";
 import { adminApprove, newAdmin, newUser, register, stamp, submitRequest, uniq } from "./helpers";
 
 const MAIL = process.env.MAILPIT_URL;
-/** On failure, show what the outbox says about this recipient (status/attempts/error CODE only), so a flake is diagnosable. */
-async function outboxState(email: string) {
-  if (!process.env.TEST_DATABASE_URL) return "no TEST_DATABASE_URL";
+/** The outbox rows for a recipient (status / attempts / error CODE only): used both as the server-side completion check and for failure diagnostics. */
+async function outboxRows(email: string) {
   const c = new Client({ connectionString: process.env.TEST_DATABASE_URL }); await c.connect();
-  try { return JSON.stringify((await c.query("select o.status, o.attempts, o.last_error, o.next_attempt_at > now() as backed_off from public.email_outbox o join auth.users u on u.id=o.user_id where u.email=$1", [email.toLowerCase()])).rows); }
+  try { return (await c.query("select o.status, o.attempts, o.last_error, o.next_attempt_at > now() as backed_off from public.email_outbox o join auth.users u on u.id=o.user_id where u.email=$1 order by o.id", [email.toLowerCase()])).rows as { status: string; attempts: number; last_error: string | null; backed_off: boolean }[]; }
   finally { await c.end(); }
+}
+/** Queue `n` emails for an opted-in recipient: a deterministic backlog that sits AHEAD of the test's own row (regression for single-batch workers). */
+async function queueBacklog(email: string, n: number) {
+  const c = new Client({ connectionString: process.env.TEST_DATABASE_URL }); await c.connect();
+  try {
+    await c.query("insert into public.notification_preferences (user_id, email_enabled) select id, true from auth.users where email=$1", [email.toLowerCase()]);
+    await c.query("insert into public.notifications (user_id, message, dedupe_key) select id, 'backlog', 'req:'||g||':bk' from auth.users, generate_series(1,$2) g where email=$1", [email.toLowerCase(), n]);
+  } finally { await c.end(); }
+}
+/** Wait for the SERVER-SIDE fact (outbox row sent), then read Mailpit. A failure reports the row state and the Mailpit count at that moment. */
+async function waitForDelivery(email: string) {
+  try {
+    await expect.poll(async () => (await outboxRows(email)).map((r) => r.status), { timeout: 20_000 }).toEqual(["sent"]);
+    let count = 0;
+    await expect.poll(async () => { count = ((await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages ?? []).length; return count; }, { timeout: 10_000 }).toBe(1);
+  } catch (e) {
+    const found = ((await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages ?? []).length;
+    throw new Error(`${(e as Error).message}\noutbox=${JSON.stringify(await outboxRows(email))} mailpit_messages=${found}`);
+  }
 }
 const status = (p: Page) => p.getByTestId("live-status");
 const badge = (p: Page) => p.locator('[data-testid="unread-badge"]:visible');
@@ -125,17 +143,21 @@ test.describe("optional email (local Mailpit only)", () => {
     await donor.page.getByLabel("Email me about new notifications").check();
     await donor.page.getByRole("button", { name: "Save settings" }).click();
     await expect(donor.page.getByText(/Email notifications are on/)).toBeVisible();
+    const bulkEmail = uniq("bulk"), bulk = await newUser(browser, { email: bulkEmail, name: `Bo ${s}`, city: `Cb${s}`, group: "O+" });
+    await queueBacklog(bulkEmail, 45); // 45 due rows, all OLDER than this test's own email: more than two worker batches
     const { hospital } = await publishRequest(browser, admin.page, city, s);
-    execFileSync("node", ["scripts/email-worker.mjs", "--once"], { stdio: "pipe" });
-    let msgs: { ID: string }[] = [];
-    await expect.poll(async () => { msgs = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages ?? []; return msgs.length; },
-      { timeout: 15_000, message: `email not delivered once. outbox=${await outboxState(email)}` }).toBe(1);
+    execFileSync("node", ["scripts/email-worker.mjs", "--once"], { stdio: "pipe" }); // must drain the whole queue, not just 20 rows
+    await waitForDelivery(email);
+    expect((await outboxRows(bulkEmail)).filter((r) => r.status === "sent")).toHaveLength(45); // the backlog was drained in that same run
+    await bulk.ctx.close();
+    const msgs: { ID: string }[] = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages;
     const msg = await (await fetch(`${MAIL}/api/v1/message/${msgs[0].ID}`)).json();
     expect(msg.Subject).toBe("DonorConnect: you have a new notification");
     expect(`${msg.Text}${msg.HTML}`).toContain("/notifications");
     expect(`${msg.Text}${msg.HTML}`).not.toContain(hospital);
     execFileSync("node", ["scripts/email-worker.mjs", "--once"], { stdio: "pipe" });
-    expect((await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages).toHaveLength(1); // not resent
+    expect((await outboxRows(email)).map((r) => [r.status, r.attempts])).toEqual([["sent", 1]]); // not resent
+    expect((await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()).messages).toHaveLength(1);
     await donor.page.getByLabel("Email me about new notifications").uncheck(); // turning it off is honoured
     await donor.page.getByRole("button", { name: "Save settings" }).click();
     await expect(donor.page.getByText(/Email notifications are off/)).toBeVisible();

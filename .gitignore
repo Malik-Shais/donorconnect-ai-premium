@@ -59,3 +59,4 @@ supabase/.env.dev
 !.env.example
 .env.test.local
 .env.worker
+supabase/.env.fresh
