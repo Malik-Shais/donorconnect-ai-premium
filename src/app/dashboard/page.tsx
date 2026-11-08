@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/auth";
 
-export default function DashboardIndex() {
-  redirect("/dashboard/donor");
+export default async function DashboardIndex() {
+  const s = await requireSession();
+  redirect(`/dashboard/${s.profile.role}`);
 }

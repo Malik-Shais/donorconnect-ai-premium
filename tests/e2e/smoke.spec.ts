@@ -13,7 +13,7 @@ test("landing renders brand, hero and compatibility explorer", async ({ page }) 
 
 test("landing and dashboard have no horizontal overflow at 360px", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  await page.goto("/dashboard/admin");
+  await page.goto("/demo/admin");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   await page.goto("/");
   await page.waitForTimeout(1200);
@@ -28,13 +28,13 @@ test("registration validates inputs", async ({ page }) => {
   await expect(page.getByText("Please confirm you are 18+")).toBeVisible();
 });
 
-test("dashboard shell works for each role and rejects unknown roles", async ({ page }) => {
+test("demo dashboards work for each role and reject unknown roles", async ({ page }) => {
   for (const [role, heading] of [["donor", "Hello, Ayesha"], ["requester", "Hello, Sana"], ["admin", "Analytics"]] as const) {
-    await page.goto(`/dashboard/${role}`);
+    await page.goto(`/demo/${role}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
   }
-  await expect(page.getByText("fictional data").first()).toBeVisible();
-  expect((await page.goto("/dashboard/hacker"))?.status()).toBe(404);
+  await expect(page.getByRole("note")).toContainText("Demo mode");
+  expect((await page.goto("/demo/hacker"))?.status()).toBe(404);
 });
 
 test("PWA manifest is served", async ({ request }) => {

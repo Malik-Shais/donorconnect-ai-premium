@@ -50,3 +50,11 @@ next-env.d.ts
 # playwright
 test-results/
 playwright-report/
+
+# local supabase dev credentials (generated)
+supabase/.env.dev
+.env.local
+
+# keep the documented template tracked, ignore real env files
+!.env.example
+.env.test.local

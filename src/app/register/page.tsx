@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Brand } from "@/components/brand";
-import { AuthForm } from "@/components/auth-form";
+import { redirect } from "next/navigation";
+import { AuthPage } from "@/components/auth-page";
+import { getSession } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Create account" };
 export default async function Register({ searchParams }: PageProps<"/register">) {
   const { role } = await searchParams;
-  return (
-    <main id="main" className="grid min-h-dvh content-start gap-8 px-5 py-8">
-      <div className="mx-auto w-full max-w-md"><Brand /></div><AuthForm mode="register" role={role === "requester" ? "requester" : "donor"} />
-    </main>
-  );
+  const s = await getSession();
+  if (s) redirect(`/dashboard/${s.profile.role}`);
+  return <AuthPage mode="register" role={role === "requester" ? "requester" : "donor"} />;
 }

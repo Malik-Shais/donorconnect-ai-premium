@@ -15,6 +15,7 @@ export function Hero() {
           <div className="mt-7 flex flex-wrap gap-3">
             <Button asChild size="lg"><Link href="/register?role=donor">Become a donor</Link></Button>
             <Button asChild size="lg" variant="outline"><Link href="/register?role=requester">Request blood</Link></Button>
+            <Button asChild size="lg" variant="ghost"><Link href="/demo/donor">Explore demo</Link></Button>
           </div>
         </motion.div>
 

@@ -1,70 +1,69 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useActionState, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Field, FormAlert, Select, SubmitButton } from "@/components/forms";
+import { forgotAction, loginAction, registerAction, resetPasswordAction } from "@/app/actions/auth";
+import { GROUPS } from "@/lib/compat";
 
-const login = z.object({ email: z.email("Enter a valid email address"), password: z.string().min(1, "Enter your password") });
-const register = login.extend({
-  name: z.string().trim().min(2, "Enter your full name").max(60),
-  role: z.enum(["donor", "requester"]),
-  password: z.string().min(8, "Use at least 8 characters").regex(/[A-Za-z]/, "Include a letter").regex(/\d/, "Include a number"),
-  terms: z.literal("on", { error: "Please confirm you are 18+ and accept the terms" }),
-});
+type Mode = "login" | "register" | "forgot" | "reset";
+const TITLE: Record<Mode, string> = { login: "Welcome back", register: "Join DonorConnect", forgot: "Reset your password", reset: "Choose a new password" };
+const ACTION = { login: loginAction, register: registerAction, forgot: forgotAction, reset: resetPasswordAction };
 
-export function AuthForm({ mode, role = "donor" }: { mode: "login" | "register"; role?: "donor" | "requester" }) {
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [done, setDone] = useState(false);
-
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const parsed = (mode === "login" ? login : register).safeParse(Object.fromEntries(new FormData(e.currentTarget)));
-    if (parsed.success) { setErrors({}); setDone(true); return; }
-    setDone(false);
-    setErrors(Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])));
-  }
-  const field = (id: string, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-navy">{label}</label>
-      <Input id={id} name={id} aria-invalid={!!errors[id]} aria-describedby={`${id}-err`} {...props} />
-      <p id={`${id}-err`} className="min-h-5 pt-1 text-sm text-red-700" role="alert">{errors[id]}</p>
-    </div>
-  );
+export function AuthForm({ mode, role = "donor", next, notice }: { mode: Mode; role?: "donor" | "requester"; next?: string; notice?: string }) {
+  const [state, action] = useActionState(ACTION[mode], undefined);
+  const [r, setR] = useState(role);
+  const done = mode === "forgot" && state?.message;
 
   return (
     <Card className="mx-auto w-full max-w-md p-6 md:p-8">
-      <h1 className="mb-5 text-3xl font-bold">{mode === "login" ? "Welcome back" : "Join DonorConnect"}</h1>
-      <form noValidate onSubmit={onSubmit} className="grid gap-1">
+      <h1 className="mb-5 text-3xl font-bold">{TITLE[mode]}</h1>
+      {notice && <p role="status" className="mb-4 rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">{notice}</p>}
+      <form action={action} noValidate className="grid gap-4">
+        {mode === "login" && next && <input type="hidden" name="next" value={next} />}
         {mode === "register" && (
           <>
-            <div>
-              <label htmlFor="role" className="mb-1.5 block text-sm font-semibold text-navy">I want to</label>
-              <select id="role" name="role" defaultValue={role} className="min-h-11 w-full rounded-xl border-[1.5px] border-line bg-white px-3">
+            <Field id="role" label="I want to" state={state} hint="Donate blood (donor) or request blood (requester).">
+              <Select id="role" name="role" value={r} onChange={(e) => setR(e.target.value as "donor" | "requester")}>
                 <option value="donor">Donate blood (donor)</option><option value="requester">Request blood (requester)</option>
-              </select><p className="min-h-5" />
-            </div>
-            {field("name", "Full name", { autoComplete: "name" })}
+              </Select>
+            </Field>
+            <Field id="full_name" label="Full name" state={state} autoComplete="name" />
           </>
         )}
-        {field("email", "Email", { type: "email", autoComplete: "email" })}
-        {field("password", "Password", { type: "password", autoComplete: mode === "login" ? "current-password" : "new-password" })}
-        {mode === "register" && (
-          <div className="mb-1">
-            <label className="flex items-start gap-2.5 text-sm"><input type="checkbox" name="terms" className="mt-0.5 size-5 accent-burgundy" /> I am 18 or older and understand this tool gives no medical advice.</label>
-            <p className="min-h-5 pt-1 text-sm text-red-700" role="alert">{errors.terms}</p>
-          </div>
+        {mode !== "reset" && <Field id="email" label="Email" type="email" state={state} autoComplete={mode === "login" ? "username" : "email"} />}
+        {(mode === "login" || mode === "register" || mode === "reset") && (
+          <Field id="password" label={mode === "reset" ? "New password" : "Password"} type="password" state={state}
+            autoComplete={mode === "login" ? "current-password" : "new-password"} hint={mode === "login" ? undefined : "8+ characters with a letter and a number."} />
         )}
-        <Button type="submit" className="mt-1">{mode === "login" ? "Sign in" : "Create account"}</Button>
+        {mode === "reset" && <Field id="confirm" label="Confirm new password" type="password" state={state} autoComplete="new-password" />}
+        {mode === "register" && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="city" label="City" state={state} autoComplete="address-level2" />
+              <Field id="phone" label="Phone (optional)" type="tel" state={state} autoComplete="tel" hint="Shared only with your consent." />
+            </div>
+            {r === "donor" && (
+              <Field id="blood_group" label="Blood group" state={state} hint="Self-reported; a lab confirms the real group.">
+                <Select id="blood_group" name="blood_group" defaultValue={state?.values?.blood_group ?? ""} aria-invalid={!!state?.fields?.blood_group}>
+                  <option value="" disabled>Select…</option>{GROUPS.map((g) => <option key={g}>{g}</option>)}
+                </Select>
+              </Field>
+            )}
+            <div>
+              <label className="flex items-start gap-2.5 text-sm"><input type="checkbox" name="terms" className="mt-0.5 size-5 accent-burgundy" />
+                I am 18 or older and understand this tool gives no medical advice.</label>
+              {state?.fields?.terms && <p role="alert" className="pt-1 text-sm text-red-700">{state.fields.terms}</p>}
+            </div>
+          </>
+        )}
+        <FormAlert state={state} />
+        {!done && <SubmitButton>{{ login: "Sign in", register: "Create account", forgot: "Send reset link", reset: "Update password" }[mode]}</SubmitButton>}
       </form>
-      {done && (
-        <p className="mt-4 rounded-xl bg-teal-soft p-3 text-sm text-teal-900" role="status">
-          Form is valid. Supabase Auth is connected in the next stage; meanwhile <Link className="font-semibold underline" href="/dashboard/donor">open the preview dashboard</Link>.
-        </p>
-      )}
-      <p className="mt-5 text-sm text-muted">
-        {mode === "login" ? <>New here? <Link className="font-semibold text-teal underline" href="/register">Create an account</Link></> : <>Already registered? <Link className="font-semibold text-teal underline" href="/login">Sign in</Link></>}
+      <p className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+        {mode === "login" && <><Link className="font-semibold text-teal underline" href="/register">Create an account</Link><Link className="font-semibold text-teal underline" href="/forgot-password">Forgot password?</Link></>}
+        {mode === "register" && <>Already registered? <Link className="font-semibold text-teal underline" href="/login">Sign in</Link></>}
+        {(mode === "forgot" || mode === "reset") && <Link className="font-semibold text-teal underline" href="/login">Back to sign in</Link>}
       </p>
     </Card>
   );
