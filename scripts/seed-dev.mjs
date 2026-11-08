@@ -37,7 +37,10 @@ if (existing.body.length === 0) {
     ["requester2@demo.example", "Patient C.", "B+", 3, "Lahore", "Example Medical Centre", "routine"],
     ["requester2@demo.example", "Patient D.", "AB+", 1, "Karachi", "Demo City Hospital", "urgent"],
   ];
-  for (const [who, patient_label, blood_group, units, city, hospital, urgency] of reqs)
-    await call("/rest/v1/blood_requests", { method: "POST", body: JSON.stringify({ requester_id: ids[who], patient_label, blood_group, units, city, hospital, urgency }) });
+  for (const [i, [who, patient_label, blood_group, units, city, hospital, urgency]] of reqs.entries()) {
+    const created = await call("/rest/v1/blood_requests", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ requester_id: ids[who], patient_label, blood_group, units, city, hospital, urgency }) });
+    // New requests start as pending_review (database default). Approve the first three; leave one in the admin queue.
+    if (i < 3) await call(`/rest/v1/blood_requests?id=eq.${created.body[0].id}`, { method: "PATCH", body: JSON.stringify({ status: "approved" }) });
+  }
 }
 console.log(`Seeded ${people.length} fictional accounts (password: ${PASSWORD}):\n  admin@demo.example, requester1@demo.example, donor1@demo.example ...`);

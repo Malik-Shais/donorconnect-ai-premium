@@ -30,6 +30,7 @@ export const profileSchema = z.object({
   blood_group: z.preprocess((v) => (v === "" || v == null ? undefined : v), bloodGroup.optional()),
   last_donation_date: optionalDate.refine(notFuture, "Last donation cannot be in the future"),
   available: z.preprocess((v) => v === "on", z.boolean()),
+  notify_new_requests: z.preprocess((v) => v === "on", z.boolean()),
 });
 
 export const requestSchema = z.object({
@@ -43,6 +44,31 @@ export const requestSchema = z.object({
 });
 
 export const closeRequestSchema = z.object({ id: z.coerce.number().int().positive(), status: z.enum(["fulfilled", "cancelled"]) });
+
+const optText = (max: number) => z.preprocess((v) => (v === "" || v == null ? undefined : v), z.string().trim().max(max, "That is too long").optional());
+const id = z.coerce.number({ error: "Invalid request" }).int().positive();
+const bool = z.enum(["true", "false"]).transform((v) => v === "true");
+
+export const transitionSchema = z.object({ id, to: z.enum(["cancelled", "fulfilled"]), note: optText(300) });
+export const inviteSchema = z.object({ id });
+export const reviewSchema = z.object({
+  id, decision: z.enum(["approve", "reject"]),
+  method: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["hospital_call", "hospital_document", "known_requester", "other"], { error: "Choose how it was verified" }).optional()),
+  note: optText(500), verified: z.string().optional(),
+}).superRefine((v, ctx) => {
+  if (v.decision === "approve" && !v.method) ctx.addIssue({ code: "custom", path: ["method"], message: "Choose how the request was verified" });
+  if (v.decision === "approve" && v.verified !== "on") ctx.addIssue({ code: "custom", path: ["verified"], message: "Confirm that you verified this request" });
+  if (v.decision === "reject" && (v.note?.length ?? 0) < 5) ctx.addIssue({ code: "custom", path: ["note"], message: "Give the requester a reason (at least 5 characters)" });
+});
+export const offerSchema = z.object({ offer: id, share: z.preprocess((v) => v === "on", z.boolean()).optional() });
+export const requestIdSchema = z.object({ request: id, share: z.preprocess((v) => v === "on", z.boolean()).optional() });
+export const consentSchema = z.object({ offer: id, granted: bool });
+export const eligibilitySchema = z.object({
+  user: z.uuid(), status: z.enum(["unverified", "cleared", "deferred"], { error: "Choose a status" }),
+  source: text(3, 120, "Source"), note: optText(300),
+  attest: z.literal("on", { error: "Confirm this decision came from an authorised blood service" }),
+});
+export const suspendSchema = z.object({ user: z.uuid(), suspended: bool, reason: optText(300) });
 
 export type FormState = { error?: string; message?: string; fields?: Record<string, string>; values?: Record<string, string> } | undefined;
 export const fieldErrors = (e: z.ZodError): Record<string, string> => {

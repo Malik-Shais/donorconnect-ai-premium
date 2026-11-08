@@ -2,7 +2,7 @@
 // REAL PostgreSQL tests (Supabase Postgres image + the project's migrations). Skipped, loudly, if TEST_DATABASE_URL is unset.
 import { afterAll, describe, expect, it } from "vitest";
 import { canGiveTo, GROUPS } from "../../src/lib/compat";
-import { as, DB_URL, makeAdmin, makeDonor, makeRequest, makeRequester, makeUser, pool, root } from "./helpers";
+import { as, DB_URL, makeAdmin, makeApprovedRequest, makeDonor, makeRequest, makeRequester, makeUser, pool, root } from "./helpers";
 
 if (!DB_URL) console.warn("\n⚠ TEST_DATABASE_URL not set: database/RLS tests SKIPPED (run `npm run db:up` first)\n");
 const d = DB_URL ? describe : describe.skip;
@@ -73,13 +73,13 @@ d("donor profiles & eligibility (healthcare decision stays with staff)", () => {
   it("donors cannot self-clear eligibility", async () => {
     const a = await makeDonor();
     await expect(as(a, (q) => q("update public.donor_profiles set eligibility_status='cleared' where user_id=$1", [a]))).rejects.toThrow(/permission denied/);
-    await expect(as(a, (q) => q("select public.set_donor_eligibility($1,'cleared','self')", [a]))).rejects.toThrow(/Administrators only/);
+    await expect(as(a, (q) => q("select public.set_donor_eligibility($1,'cleared','Self','x')", [a]))).rejects.toThrow(/Administrators only/);
   });
   it("only an admin can set eligibility; it is audited and notified", async () => {
     const a = await makeDonor(), admin = await makeAdmin();
-    await as(admin, (q) => q("select public.set_donor_eligibility($1,'deferred','Staff decision')", [a]));
+    await as(admin, (q) => q("select public.set_donor_eligibility($1,'deferred','Test Blood Service','Staff decision')", [a]));
     expect((await as(a, (q) => q("select eligibility_status from public.donor_profiles")))[0].eligibility_status).toBe("deferred");
-    expect(await as(admin, (q) => q("select 1 from public.audit_logs where action='eligibility.set' and entity_id=$1", [a]))).toHaveLength(1);
+    expect(await as(admin, (q) => q("select 1 from public.audit_logs where action='eligibility.record' and entity_id=$1", [a]))).toHaveLength(1);
   });
   it("rejects future last-donation dates", async () => {
     const a = await makeDonor();
@@ -87,7 +87,7 @@ d("donor profiles & eligibility (healthcare decision stays with staff)", () => {
   });
   it("encodes no donation interval: a donation yesterday does not block matching by itself", async () => {
     const a = await makeDonor("O+"), r = await makeRequester();
-    await makeRequest(r, "O+");
+    await makeApprovedRequest(r, "O+");
     await as(a, (q) => q("update public.donor_profiles set last_donation_date = current_date - 1 where user_id=$1", [a]));
     expect((await as(a, (q) => q("select * from public.open_requests_for_donor()"))).length).toBeGreaterThan(0);
   });
@@ -112,33 +112,16 @@ d("blood requests", () => {
     expect(await as(don, (q) => q("select id from public.blood_requests"))).toHaveLength(0);
     expect((await as(admin, (q) => q("select id from public.blood_requests"))).map((r) => r.id)).toEqual(expect.arrayContaining([id1, id2]));
   });
-  it("owner may fulfil/cancel (history recorded) but not set matched/open or touch others' requests", async () => {
-    const r1 = await makeRequester(), r2 = await makeRequester(), admin = await makeAdmin();
-    const id = await makeRequest(r1);
-    await expect(as(r1, (q) => q("update public.blood_requests set status='matched' where id=$1", [id]))).rejects.toThrow(/row-level security/);
-    expect(await as(r2, (q) => q("update public.blood_requests set status='cancelled' where id=$1 returning 1", [id]))).toHaveLength(0);
-    await expect(as(r1, (q) => q("update public.blood_requests set units=9 where id=$1", [id]))).rejects.toThrow(/permission denied/);
-    await as(r1, (q) => q("update public.blood_requests set status='fulfilled' where id=$1", [id]));
-    expect((await as(r1, (q) => q("select status from public.request_events where request_id=$1 order by id", [id]))).map((e) => e.status)).toEqual(["open", "fulfilled"]);
-    expect(await as(r2, (q) => q("select * from public.request_events where request_id=$1", [id]))).toHaveLength(0);
-    expect(await as(admin, (q) => q("select 1 from public.audit_logs where entity_id=$1 and action like 'request.%'", [id]))).toHaveLength(2);
-  });
-  it("closed requests cannot be reopened or removed", async () => {
-    const r1 = await makeRequester(), id = await makeRequest(r1);
-    await as(r1, (q) => q("update public.blood_requests set status='cancelled' where id=$1", [id]));
-    expect(await as(r1, (q) => q("update public.blood_requests set status='fulfilled' where id=$1 returning 1", [id]))).toHaveLength(0);
-    await expect(as(r1, (q) => q("delete from public.blood_requests where id=$1", [id]))).rejects.toThrow(/permission denied/);
-  });
 });
 
 d("matching, offers and contact consent", () => {
   it("donors see only compatible, available, non-deferred requests, with no requester identity", async () => {
     const req = await makeRequester(), admin = await makeAdmin();
-    const abPlus = await makeRequest(req, "AB+"), oNeg = await makeRequest(req, "O-");
+    const abPlus = await makeApprovedRequest(req, "AB+"), oNeg = await makeApprovedRequest(req, "O-");
     const okDonor = await makeDonor("O-"), aPlusDonor = await makeDonor("A+");
     const unavailable = await makeDonor("O-"), deferred = await makeDonor("O-");
     await as(unavailable, (q) => q("update public.donor_profiles set available=false where user_id=$1", [unavailable]));
-    await as(admin, (q) => q("select public.set_donor_eligibility($1,'deferred',null)", [deferred]));
+    await as(admin, (q) => q("select public.set_donor_eligibility($1,'deferred','Test Blood Service',null)", [deferred]));
     const ids = (u: string) => as(u, (q) => q<{ id: string }>("select id from public.open_requests_for_donor()")).then((r) => r.map((x) => x.id));
     expect(await ids(okDonor)).toEqual(expect.arrayContaining([abPlus, oNeg]));
     expect(await ids(aPlusDonor)).toContain(abPlus);       // A+ can give to AB+
@@ -150,44 +133,46 @@ d("matching, offers and contact consent", () => {
     expect(cols).not.toContain("patient_label");
   });
   it("accept_request enforces role, compatibility and availability", async () => {
-    const req = await makeRequester(), id = await makeRequest(req, "O-");
+    const req = await makeRequester(), id = await makeApprovedRequest(req, "O-");
     const bad = await makeDonor("A+");
     await expect(as(bad, (q) => q("select public.accept_request($1,false)", [id]))).rejects.toThrow(/not preliminarily compatible/);
     await expect(as(req, (q) => q("select public.accept_request($1,false)", [id]))).rejects.toThrow(/Only donors/);
     await expect(as(null, (q) => q("select public.accept_request($1,false)", [id]))).rejects.toThrow(/permission denied/);
-    await expect(as(await makeDonor("O-"), (q) => q("select public.accept_request(999999,false)"))).rejects.toThrow(/no longer open/);
+    await expect(as(await makeDonor("O-"), (q) => q("select public.accept_request(999999,false)"))).rejects.toThrow(/not open to donors/);
   });
   it("contact details are hidden without consent, shown with consent, hidden again on revoke", async () => {
-    const req = await makeRequester({ phone: "0311 0000000" }), other = await makeRequester(), id = await makeRequest(req, "A+");
+    const req = await makeRequester({ phone: "0311 0000000" }), other = await makeRequester(), id = await makeApprovedRequest(req, "A+");
     const don = await makeDonor("O+", { phone: "0300 5555555" }), bystander = await makeDonor("O+");
     const [{ accept_request: oid }] = await as(don, (q) => q<{ accept_request: string }>("select public.accept_request($1,false)", [id]));
-    const contacts = (u: string) => as(u, (q) => q("select * from public.consented_contacts($1)", [id]));
-    expect(await contacts(req)).toHaveLength(0); // accepted but no consent
+    const offers = (u: string) => as(u, (q) => q("select * from public.owner_request_offers($1)", [id]));
+    let [o] = await offers(req);
+    expect(o).toMatchObject({ contact_shared: false, donor_name: null, phone: null, email: null }); // accepted but no consent
     expect((await root("select status from public.blood_requests where id=$1", [id]))[0].status).toBe("matched");
     expect(await as(req, (q) => q("select * from public.notifications where message like '%accepted%'"))).toHaveLength(1);
 
     await as(don, (q) => q("select public.set_contact_consent($1,true)", [oid]));
-    const [c] = await contacts(req);
-    expect(c).toMatchObject({ phone: "0300 5555555", blood_group: "O+" });
-    expect(String(c.email)).toContain("@test.example");
-    expect(await contacts(other)).toHaveLength(0);     // other requester
-    expect(await contacts(bystander)).toHaveLength(0); // unrelated donor
-    expect(await contacts(don)).toHaveLength(0);       // donor is not the request owner
+    [o] = await offers(req);
+    expect(o).toMatchObject({ contact_shared: true, phone: "0300 5555555", blood_group: "O+" });
+    expect(String(o.email)).toContain("@test.example");
+    await expect(offers(other)).rejects.toThrow(/Request not found/);     // other requester
+    await expect(offers(bystander)).rejects.toThrow(/Request not found/); // unrelated donor
+    await expect(offers(don)).rejects.toThrow(/Request not found/);       // donors cannot use the owner view
 
     await expect(as(bystander, (q) => q("select public.set_contact_consent($1,false)", [oid]))).rejects.toThrow(/Offer not found/);
     await as(don, (q) => q("select public.set_contact_consent($1,false)", [oid]));
-    expect(await contacts(req)).toHaveLength(0);
+    [o] = await offers(req);
+    expect(o).toMatchObject({ contact_shared: false, phone: null, email: null }); // consent is revocable
     expect(await as(await makeAdmin(), (q) => q("select * from public.audit_logs where action in ('consent.grant','consent.revoke') and entity_id=$1", [oid]))).toHaveLength(2);
   });
   it("offers and consent rows are isolated between users", async () => {
-    const req = await makeRequester(), id = await makeRequest(req, "O+");
+    const req = await makeRequester(), id = await makeApprovedRequest(req, "O+");
     const a = await makeDonor("O+"), b = await makeDonor("O+");
     await as(a, (q) => q("select public.accept_request($1,true)", [id]));
     expect(await as(a, (q) => q("select * from public.offers"))).toHaveLength(1);
     expect(await as(b, (q) => q("select * from public.offers"))).toHaveLength(0);
     expect(await as(b, (q) => q("select * from public.contact_consents"))).toHaveLength(0);
     expect(await as(req, (q) => q("select * from public.contact_consents"))).toHaveLength(0); // requester cannot read consent table
-    expect(await as(req, (q) => q("select * from public.offers where request_id=$1", [id]))).toHaveLength(1);
+    expect(await as(req, (q) => q("select * from public.offers where request_id=$1", [id]))).toHaveLength(0); // requesters never read raw offer rows (donor ids)
     await expect(as(b, (q) => q("insert into public.offers (request_id,donor_id,origin,status) values ($1,$2,'volunteered','accepted')", [id, b]))).rejects.toThrow(/permission denied/);
     await expect(as(a, (q) => q("update public.contact_consents set granted=false"))).rejects.toThrow(/permission denied/);
   });
@@ -208,14 +193,14 @@ d("notifications, audit logs and function exposure", () => {
   });
   it("audit logs are admin-read-only and unwritable by users", async () => {
     const a = await makeDonor(), admin = await makeAdmin();
-    await as(admin, (q) => q("select public.set_donor_eligibility($1,'cleared',null)", [a]));
+    await as(admin, (q) => q("select public.set_donor_eligibility($1,'cleared','Test Blood Service',null)", [a]));
     expect(await as(a, (q) => q("select * from public.audit_logs"))).toHaveLength(0);
     expect((await as(admin, (q) => q("select * from public.audit_logs"))).length).toBeGreaterThan(0);
     await expect(as(admin, (q) => q("insert into public.audit_logs (action,entity) values ('x','y')"))).rejects.toThrow(/permission denied/);
     await expect(as(admin, (q) => q("delete from public.audit_logs"))).rejects.toThrow(/permission denied/);
   });
   it("anonymous users cannot execute any application function", async () => {
-    for (const fn of ["open_requests_for_donor()", "is_admin()", "consented_contacts(1)"]) {
+    for (const fn of ["open_requests_for_donor()", "is_admin()", "owner_request_offers(1)", "my_offers()"]) {
       await expect(as(null, (q) => q(`select * from public.${fn}`))).rejects.toThrow(/permission denied/);
     }
   });

@@ -4,16 +4,19 @@ Blood donor coordination platform. **Next.js 16 (App Router) · React 19 · Type
 
 > Matching is preliminary. The app never diagnoses, never makes transfusion decisions and never decides donor eligibility. Eligibility is a status recorded by authorised staff; **no donation interval is hard-coded anywhere.**
 
-## Status: Stage 2 (real backend)
+## Status: Stage 3 (request workflows)
 | Area | State |
 |---|---|
-| Landing page, design system, PWA | done (stage 1) |
-| PostgreSQL schema, versioned migrations, RLS, audit log | **done, tested against real PostgreSQL** |
-| Register / login / logout / session persistence / password recovery | **done, tested end-to-end in a real browser** |
-| Role-based route protection (proxy + per-page + per-action + RLS) | **done, tested** |
-| Profiles, donor availability, requests (create / cancel / fulfil), donor opportunities + accept, consent-based contact sharing (database), notifications, admin user list | **done** (consent *UI* for requesters is next) |
-| Demo mode with fictional data (`/demo/*`) | kept, clearly labelled |
-| Gemini AI agent, advanced analytics, realtime, rate limiting | **not started** (by design: after auth/DB verification) |
+| Landing, design system, PWA, demo mode (`/demo/*`) | done |
+| PostgreSQL schema, 6 versioned migrations, RLS, audit log | **done, tested against real PostgreSQL** |
+| Register / login / logout / sessions / password recovery | **done, tested in a real browser** |
+| **Requester**: 3-step request wizard, status + timeline, anonymous invitations, consented contact display, cancel / fulfil | **done, tested** |
+| **Admin**: review queue (verification method, audited decisions), request management + full history/audit, moderation cancel, user suspension, **recording** of blood-service eligibility decisions | **done, tested** |
+| **Donor**: filtered preliminary opportunities, accept/decline invitations, offers manager, revocable contact consent, notification preference | **done, tested** |
+| Realtime, rate limiting, Gemini AI, advanced analytics | **not started** (Stage 4+) |
+
+### Request lifecycle
+`pending_review` → (`approved` | `rejected`) by an admin; `approved` ⇄ `matched` automatically as donors accept/withdraw; `matched` → `fulfilled` by the requester; `cancelled` by the requester or (with a note) an admin. `rejected`/`fulfilled`/`cancelled` are terminal. Donors never see or hear about a request before it is approved. Full table and rules: [`docs/V2-ARCHITECTURE.md`](docs/V2-ARCHITECTURE.md).
 
 ## Quick start (needs Docker)
 ```bash
@@ -47,20 +50,19 @@ Roles live in `public.profiles.role`, writable only by the database owner/servic
 
 ## Tests
 ```bash
-npm test            # Vitest: unit + validation + 28 SQL/RLS tests (real Postgres) + 6 live HTTP API tests (real GoTrue/PostgREST)
-npm run test:e2e    # builds, then Playwright (desktop + Pixel 7): 34 tests incl. real registration/login/recovery
+npm test            # Vitest: unit/validation + 26 SQL/RLS + 23 workflow (incl. 3 concurrency races) + 7 live HTTP API tests
+npm run test:e2e    # builds, then Playwright on desktop + Pixel 7 (needs `npm run db:up && npm run db:seed`)
 npm run lint && npm run typecheck
 ```
-DB and API tests **skip with a visible warning** when the stack isn't running; they never fall back to mocks. RLS tests were mutation-checked (deliberately weakening a grant/policy makes them fail).
+DB/API tests **skip with a visible warning** when the stack isn't running; they never fall back to mocks. Security tests were mutation-checked (deliberately weakening a grant, a trigger or `is_admin()` makes specific tests fail).
 
-### What was verified live (local Docker stack)
-Migrations apply cleanly; sign-up/sign-in/recovery against real GoTrue; role-escalation, cross-user read/write, anonymous access, forged JWT, eligibility self-clearing, consent grant/revoke, audit-log protection; full browser flows on desktop and mobile; real reset email via Mailpit.
+**Verified live on the local Docker stack (real Supabase Postgres, GoTrue, PostgREST, Mailpit):** migrations from an empty database; the full requester → admin review → donor offer → consent → revoke → re-consent → fulfil journey; rejection; cancellation (requester and admin moderation); anonymous invitations; withdrawal; eligibility recording; suspension; cross-user access; forged/escalating requests (role change, `approved` insert, direct status patch, forged JWT); concurrent accepts and concurrent approve/reject; responsive layouts at 360/390/768/1280 px.
 
 ### Not verified / not done (be aware)
-- **A hosted Supabase project** was not available: nothing here was run against supabase.com. Local GoTrue/PostgREST/Postgres versions are pinned in `supabase/docker-compose.yml`; hosted behaviour may differ in small ways (e.g. SMTP, email confirmation).
-- Local dev sets `GOTRUE_MAILER_AUTOCONFIRM=true`. **Production must require email confirmation** and a real SMTP provider.
-- The official `supabase` CLI (`supabase start/db push`) was not run (binary download blocked here); migrations follow its conventions but this path is untested.
-- No app-level rate limiting yet (only GoTrue's built-in limits); no CSP (basic security headers only); no screen-reader or Lighthouse audit; Realtime not wired; requester-facing contact display, invitations and admin eligibility UI are next (their database functions and RLS are done and tested).
+- **No hosted Supabase project** was used; nothing was run against supabase.com. The official `supabase` CLI was not run (binary download blocked in the build sandbox).
+- Local dev auto-confirms emails (`GOTRUE_MAILER_AUTOCONFIRM=true`); **production must require email confirmation** and real SMTP. No email delivery of notifications (in-app only).
+- No app-level rate limiting (GoTrue limits only), no CSP (basic security headers), no screen-reader or Lighthouse audit, no Realtime, no pagination beyond the newest 100 users/donors (search is provided).
+- Admin analytics are live counts only; charts/reports arrive later.
 
 ## Using a hosted Supabase project (untested here)
 1. Create a free project; in SQL editor run the files in `supabase/migrations/` in order (or `supabase db push`).

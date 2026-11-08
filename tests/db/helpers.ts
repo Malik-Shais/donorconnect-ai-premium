@@ -55,3 +55,17 @@ export async function makeRequest(requester: string, blood_group = "A+", city = 
      values ($1, 'Patient X', $2, 2, $3, 'Demo Hospital', 'urgent') returning id`, [requester, blood_group, city]));
   return r.id;
 }
+
+let sharedAdmin: Promise<string> | undefined;
+/** One reusable admin per test run (admins are only ever created by privileged setup, never via sign-up). */
+export const getAdmin = () => (sharedAdmin ??= makeAdmin());
+export async function approve(requestId: string, method = "hospital_call") {
+  const admin = await getAdmin();
+  await as(admin, (q) => q("select public.review_request($1,'approve',null,$2)", [requestId, method]));
+}
+/** A request that has passed admin review (visible to donors). */
+export async function makeApprovedRequest(requester: string, blood_group = "A+", city = "Lahore") {
+  const id = await makeRequest(requester, blood_group, city);
+  await approve(id);
+  return id;
+}

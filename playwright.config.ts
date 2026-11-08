@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config } from "dotenv";
 
-config({ path: ".env.test.local", quiet: true }); // MAILPIT_URL etc. for the real-stack auth tests
+config({ path: ".env.local", quiet: true }); config({ path: ".env.test.local", quiet: true }); // MAILPIT_URL etc. for the real-stack auth tests
 const launchOptions = { executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--no-sandbox"] };
 export default defineConfig({
   testDir: "tests/e2e",

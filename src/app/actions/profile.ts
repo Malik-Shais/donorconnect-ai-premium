@@ -15,7 +15,7 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (session.profile.role === "donor") {
     if (!v.blood_group) return { fields: { blood_group: "Choose your blood group" } };
     const { error: e2 } = await supabase.from("donor_profiles")
-      .update({ blood_group: v.blood_group, available: v.available, last_donation_date: v.last_donation_date ?? null }).eq("user_id", session.profile.id);
+      .update({ blood_group: v.blood_group, available: v.available, last_donation_date: v.last_donation_date ?? null, notify_new_requests: v.notify_new_requests }).eq("user_id", session.profile.id);
     if (e2) return { error: "We couldn't save your donor details. Please try again." };
   }
   revalidatePath("/dashboard", "layout");

@@ -12,7 +12,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from("profiles").select("*, donor_profiles(*)").eq("id", user.id).maybeSingle();
+  const { data } = await supabase.from("profiles").select("*, donor_profiles!user_id(*)").eq("id", user.id).maybeSingle();
   if (!data) return null;
   const { donor_profiles, ...profile } = data as Profile & { donor_profiles: DonorProfile | null };
   return { email: user.email ?? "", profile, donor: donor_profiles };
@@ -21,6 +21,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
 export async function requireSession(): Promise<Session> {
   const s = await getSession();
   if (!s) redirect("/login");
+  if (s.profile.suspended) redirect("/suspended");
   return s;
 }
 

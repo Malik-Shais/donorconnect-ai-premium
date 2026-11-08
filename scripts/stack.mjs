@@ -35,6 +35,7 @@ function migrate() {
     psql(["-c", `insert into supabase_migrations.schema_migrations values ('${version}','${rest.join("_")}')`]);
     console.log("applied", f);
   }
+  psql(["-c", "notify pgrst, 'reload schema'"]); // PostgREST picks up new tables/functions without a restart
 }
 
 const cmd = process.argv[2];

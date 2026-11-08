@@ -46,13 +46,13 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
           })}
         </nav>
         <div className="mt-auto space-y-2 p-2">
-          {demo ? <><p className="text-xs text-slate-400">Demo role (fictional data)</p>{Role}</> : <Account user={user} />}
+          {demo ? <><p className="text-xs text-slate-400">Demo role (fictional data)</p>{Role}</> : <Account user={user} profileHref={`${base}/profile`} />}
         </div>
       </aside>
 
       <div className="min-w-0">
         <header className="sticky top-0 z-20 flex flex-col gap-2 bg-navy px-4 py-3 md:hidden">
-          <Brand light /> {demo ? Role : <Account user={user} compact />}
+          <Brand light /> {demo ? Role : <Account user={user} compact profileHref={`${base}/profile`} />}
         </header>
         <main id="main" className="px-4 pb-28 pt-6 md:px-10 md:pb-10 md:pt-9">
           {demo && (
@@ -78,10 +78,10 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
   );
 }
 
-function Account({ user, compact }: { user?: ShellUser; compact?: boolean }) {
+function Account({ user, compact, profileHref }: { user?: ShellUser; compact?: boolean; profileHref?: string }) {
   return (
     <div className={cn("flex items-center gap-3", compact ? "justify-between" : "flex-col items-start")}>
-      <p className="min-w-0 truncate text-xs text-slate-300" title={user?.email}>{user?.name}</p>
+      <p className="min-w-0 truncate text-xs text-slate-300" title={user?.email}>{profileHref ? <Link href={profileHref} className="underline decoration-slate-500 underline-offset-2">{user?.name}</Link> : user?.name}</p>
       <form action={logoutAction}><button className="min-h-9 rounded-full border border-slate-500 px-4 text-sm font-semibold text-white hover:bg-white/10">Sign out</button></form>
     </div>
   );

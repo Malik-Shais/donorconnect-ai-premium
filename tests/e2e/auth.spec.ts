@@ -1,31 +1,7 @@
 // REAL end-to-end tests: browser -> Next.js -> GoTrue (Auth) -> PostgreSQL/RLS. Requires `npm run db:up && npm run db:seed`.
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const PASSWORD = "Passw0rd!x";
-const uniq = (tag: string) => `e2e.${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}@test.example`;
-
-async function register(page: Page, o: { email: string; name?: string; role?: "donor" | "requester"; group?: string; city?: string }) {
-  await page.goto(`/register?role=${o.role ?? "donor"}`);
-  await page.getByLabel("Full name").fill(o.name ?? "Test Person");
-  await page.getByLabel("Email").fill(o.email);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByLabel("City").fill(o.city ?? "Lahore");
-  if ((o.role ?? "donor") === "donor") await page.getByLabel("Blood group").selectOption(o.group ?? "O+");
-  await page.getByLabel(/I am 18 or older/).check();
-  await page.getByRole("button", { name: "Create account" }).click();
-}
-const login = async (page: Page, email: string, password = PASSWORD) => {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-};
-const signOut = async (page: Page) => { await page.getByRole("button", { name: "Sign out" }).click(); await page.waitForURL("/"); };
-async function newUser(browser: Browser, o: Parameters<typeof register>[1]) {
-  const ctx = await browser.newContext(); const page = await ctx.newPage();
-  await register(page, o); await page.waitForURL(/\/dashboard\//);
-  return { ctx, page };
-}
+import { login, newUser, PASSWORD, register, signOut, uniq } from "./helpers";
 
 test.describe("route protection", () => {
   test("unauthenticated visitors are sent to sign-in for every protected route", async ({ page }) => {
@@ -122,7 +98,7 @@ test.describe("authorization", () => {
     await login(page, "admin@demo.example", "Demo@12345");
     await expect(page).toHaveURL(/\/dashboard\/admin$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analytics");
-    await page.goto("/dashboard/admin/users");
+    await page.goto("/dashboard/admin/users?q=Ayesha"); // the list shows the newest 100; search finds anyone
     await expect(page.getByRole("cell", { name: "Ayesha Khan" })).toBeVisible();
     await page.goto("/dashboard/donor"); // admin is not a donor
     await expect(page).toHaveURL(/\/dashboard\/admin$/);
@@ -133,13 +109,13 @@ test.describe("profile", () => {
   test("profile and availability updates persist in the database", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, { email: uniq("prof"), city: "Lahore" });
     await page.goto("/dashboard/donor/profile");
-    await page.getByLabel("City").fill("Karachi");
+    await page.getByLabel("City", { exact: true }).fill("Karachi");
     await page.getByLabel("Phone").fill("+92 300 1112233");
     await page.getByLabel("Blood group").selectOption("B+");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status")).toContainText("Profile saved");
     await page.reload();
-    await expect(page.getByLabel("City")).toHaveValue("Karachi");
+    await expect(page.getByLabel("City", { exact: true })).toHaveValue("Karachi");
     await expect(page.getByLabel("Phone")).toHaveValue("+92 300 1112233");
     await expect(page.getByLabel("Blood group")).toHaveValue("B+");
 
@@ -156,44 +132,6 @@ test.describe("profile", () => {
     await page.reload();
     await expect(page.getByRole("switch")).toHaveAttribute("aria-checked", "false");
     await ctx.close();
-  });
-});
-
-test.describe("requests across users", () => {
-  test("requester creates/cancels; other requester cannot see it; compatible donor sees and accepts it", async ({ browser }) => {
-    const hospital = `E2E Hospital ${Date.now()}`; // unique per run: the database persists between runs
-    const r1 = await newUser(browser, { email: uniq("r1"), role: "requester", name: "Rita Requester" });
-    const r2 = await newUser(browser, { email: uniq("r2"), role: "requester", name: "Omar Other" });
-    const donor = await newUser(browser, { email: uniq("dn"), group: "O-", name: "Dina Donor" });
-
-    await r1.page.goto("/dashboard/requester/new-request");
-    await r1.page.getByRole("button", { name: "Post request" }).click();
-    await expect(r1.page.getByText("Patient alias must be at least 2 characters")).toBeVisible();
-    await r1.page.getByLabel("Patient alias / initials").fill("Pat X.");
-    await r1.page.getByLabel("Blood group needed").selectOption("A+");
-    await r1.page.getByLabel("Hospital / blood bank").fill(hospital);
-    await r1.page.getByRole("button", { name: "Post request" }).click();
-    await expect(r1.page).toHaveURL(/\/dashboard\/requester\/requests/);
-    await expect(r1.page.getByText(hospital)).toBeVisible();
-
-    await r2.page.goto("/dashboard/requester/requests"); // cross-user: must not see r1's request
-    await expect(r2.page.getByText(hospital)).toHaveCount(0);
-    await expect(r2.page.getByText("No requests yet")).toBeVisible();
-
-    await donor.page.goto("/dashboard/donor/opportunities"); // O- can give to A+
-    const card = donor.page.locator("li", { has: donor.page.locator("form") }).filter({ hasText: hospital });
-    await expect(card).toBeVisible();
-    await expect(card).not.toContainText("Pat X."); // requester-provided patient label is not exposed to donors
-    await card.getByRole("button", { name: "I can help" }).click();
-    await expect(donor.page.getByText("You accepted this request")).toHaveCount(1);
-
-    await r1.page.goto("/dashboard/requester/notifications");
-    await expect(r1.page.getByText(/A donor accepted your A\+ request\./)).toBeVisible();
-    await r1.page.goto("/dashboard/requester/requests");
-    await expect(r1.page.getByText("matched", { exact: true })).toBeVisible();
-    await r1.page.getByRole("button", { name: "Cancel" }).click();
-    await expect(r1.page.getByText("cancelled", { exact: true })).toBeVisible();
-    for (const u of [r1, r2, donor]) await u.ctx.close();
   });
 });
 
