@@ -9,6 +9,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}", "tests/db/**/*.test.ts"],
+    globalSetup: ["tests/db/global-setup.ts"],
     env: loadEnv("test", process.cwd(), ""), // picks up TEST_DATABASE_URL from .env.local
     fileParallelism: false, // DB tests share one database
     testTimeout: 20_000,
