@@ -1,19 +1,19 @@
 import "server-only";
 import { FunctionCallingConfigMode, GoogleGenAI } from "@google/genai";
 
-export type Part = { text: string } | { functionCall: { name: string; args: Record<string, unknown> } } | { functionResponse: { name: string; response: Record<string, unknown> } };
+export type Part = { text: string } | { functionCall: { name: string; args: Record<string, unknown> }; thoughtSignature?: string } | { functionResponse: { name: string; response: Record<string, unknown> } };
 export type Content = { role: "user" | "model"; parts: Part[] };
-export type ModelEvent = { type: "text"; text: string } | { type: "call"; name: string; args: Record<string, unknown> };
+export type ModelEvent = { type: "text"; text: string } | { type: "call"; name: string; args: Record<string, unknown>; thoughtSignature?: string };
 export type ToolDecl = { name: string; description: string; parametersJsonSchema: Record<string, unknown> };
 export type ModelRequest = { system: string; contents: Content[]; tools: ToolDecl[]; signal?: AbortSignal };
 export type Provider = { name: "gemini" | "mock"; stream: (r: ModelRequest) => AsyncGenerator<ModelEvent> };
 
 // Model id comes from the environment. The default is the model used in the official @google/genai documentation; override with
 // GEMINI_MODEL for a model available to your key. The key is read only here, on the server.
-const MODEL = () => process.env.GEMINI_MODEL || "gemini-3.8-flash";
+const MODEL = () => process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 function gemini(apiKey: string): Provider {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Number(process.env.GEMINI_TIMEOUT_MS) || 25_000, retryOptions: { attempts: 1 } } }) // live check: an overloaded model stalled 160s+ behind SDK retries;
   return {
     name: "gemini",
     async *stream({ system, contents, tools, signal }) {
@@ -26,7 +26,8 @@ function gemini(apiKey: string): Provider {
         },
       });
       for await (const chunk of res) {
-        for (const c of chunk.functionCalls ?? []) if (c.name) yield { type: "call", name: c.name, args: (c.args ?? {}) as Record<string, unknown> };
+        // Gemini 3 rejects a replayed functionCall (400) unless its thoughtSignature is sent back with it.
+        for (const p of chunk.candidates?.[0]?.content?.parts ?? []) if (p.functionCall?.name) yield { type: "call", name: p.functionCall.name, args: (p.functionCall.args ?? {}) as Record<string, unknown>, thoughtSignature: p.thoughtSignature };
         const t = chunk.candidates?.[0]?.content?.parts?.filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("");
         if (t) yield { type: "text", text: t };
       }

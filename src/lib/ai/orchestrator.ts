@@ -18,8 +18,9 @@ export const ERROR_TEXT: Record<AiErrorCode, string> = {
 };
 /** Provider errors are mapped to a small, safe vocabulary: raw SDK/API messages are never shown to users or logged with content. */
 export function classifyError(e: unknown, aborted: boolean): AiErrorCode {
-  if (aborted || (e as { name?: string })?.name === "AbortError") return "aborted";
+  if (aborted) return "aborted"; // only a user Stop; an SDK timeout is also an AbortError but must read as "unavailable"
   const status = Number((e as { status?: number })?.status ?? 0);
+  if (status === 400 && /API_KEY_INVALID|API key not valid/i.test(String((e as Error)?.message))) return "auth"; // Google answers a bad key with 400
   if (status === 429) return "quota";
   if (status === 401 || status === 403) return "auth";
   if (status >= 500 || status === 400 || status === 404 || status === 0) return "unavailable";
@@ -55,7 +56,7 @@ export async function* runAssistant({ role, message, history, provider, tools, e
         return;
       }
       const used = calls.slice(0, MAX_CALLS_PER_ROUND);
-      contents.push({ role: "model", parts: used.map((c) => ({ functionCall: { name: c.name, args: c.args } })) });
+      contents.push({ role: "model", parts: used.map((c) => ({ functionCall: { name: c.name, args: c.args }, ...(c.thoughtSignature && { thoughtSignature: c.thoughtSignature }) })) });
       const responses: Content["parts"] = [];
       for (const c of used) {
         yield { type: "tool", name: c.name };

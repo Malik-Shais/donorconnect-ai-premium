@@ -93,5 +93,7 @@ describe("tool permission matrix", () => {
 
 describe("provider error mapping", () => {
   it.each([[429, "quota"], [503, "unavailable"], [401, "auth"], [403, "auth"], [400, "unavailable"]])("HTTP %i -> %s", (status, code) => expect(classifyError({ status }, false)).toBe(code));
+  it("invalid key (HTTP 400 API_KEY_INVALID) -> auth", () => expect(classifyError({ status: 400, message: '{"reason":"API_KEY_INVALID"}' }, false)).toBe("auth"));
+  it("SDK timeout (AbortError without user stop) -> unavailable", () => expect(classifyError(Object.assign(new Error("t"), { name: "AbortError" }), false)).toBe("unavailable"));
   it("abort wins", () => expect(classifyError(new Error("x"), true)).toBe("aborted"));
 });

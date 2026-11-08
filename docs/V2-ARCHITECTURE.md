@@ -77,7 +77,7 @@ CSP: same-origin everywhere, connections only to this origin and the Supabase AP
 
 **Errors.** Provider failures map to a small vocabulary (`quota`, `unavailable`, `auth`, `not_configured`); raw SDK messages are never shown. Output is capped (700 tokens, 3 tool rounds, 4 calls per round).
 
-**Model.** `GEMINI_MODEL`, default `gemini-3.8-flash` (named in the `@google/genai` 3.0.0 documentation). The Google docs site and the model list were unreachable from the build sandbox, so availability of that id for a given key is **not verified**; change the variable if the API reports it unavailable.
+**Model.** `GEMINI_MODEL`, default `gemini-3.6-flash`, chosen after a live ListModels + streaming probe (Stage 5 live check: `gemini-3.8-flash`/`3.7-flash` stalled 160s+ or returned 503 under demand; `2.5-flash` returned 404 for the key). Requests time out after 25s (`GEMINI_TIMEOUT_MS`) with no SDK retries so an overloaded model degrades to the "unavailable" message.
 
 **Mock vs live.** Automated tests use a deterministic mock provider that requires *both* `AI_PROVIDER=mock` and `DC_ALLOW_AI_MOCK=1` (set only by `playwright.config.ts`). It can simulate a compromised model, quota errors and slow streams. `tests/live/gemini.live.spec.ts` is the only live-Gemini test; it needs `GEMINI_API_KEY` and `DC_LIVE=1` (`npm run test:live`) and is skipped otherwise.
 
