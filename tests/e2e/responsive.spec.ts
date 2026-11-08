@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers";
 
 const SCREENS: Record<string, string[]> = {
-  "donor1@demo.example": ["donor", "donor/opportunities", "donor/offers", "donor/profile", "donor/notifications", "donor/assistant"],
-  "requester1@demo.example": ["requester", "requester/requests", "requester/new-request", "requester/notifications", "requester/profile", "requester/assistant"],
-  "admin@demo.example": ["admin", "admin/review", "admin/requests", "admin/users", "admin/donors", "admin/notifications", "admin/assistant"],
+  "donor1@demo.example": ["donor", "donor/opportunities", "donor/offers", "donor/profile", "donor/notifications", "donor/assistant", "donor/analytics"],
+  "requester1@demo.example": ["requester", "requester/requests", "requester/new-request", "requester/notifications", "requester/profile", "requester/assistant", "requester/analytics"],
+  "admin@demo.example": ["admin", "admin/review", "admin/requests", "admin/users", "admin/donors", "admin/notifications", "admin/assistant", "admin/reports"],
 };
 
 test.skip(({ isMobile }) => isMobile, "widths are set explicitly; run once on the desktop project");

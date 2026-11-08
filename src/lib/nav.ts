@@ -10,7 +10,7 @@ const assistant: NavItem = { slug: "assistant", label: "Assistant", icon: "spark
 
 // The first five entries form the mobile bottom bar, so they are ordered by importance.
 export const NAV: Record<Role, NavItem[]> = {
-  donor: [home(), { slug: "opportunities", label: "Opportunities", icon: "heart" }, { slug: "offers", label: "My offers", icon: "handshake" }, alerts, profile, assistant],
-  requester: [home(), { slug: "requests", label: "My requests", icon: "list" }, { slug: "new-request", label: "New request", icon: "plus" }, alerts, profile, assistant],
-  admin: [home("Analytics", "chart"), { slug: "review", label: "Review queue", icon: "list" }, { slug: "requests", label: "Requests", icon: "file" }, { slug: "users", label: "Users", icon: "users" }, alerts, { slug: "donors", label: "Eligibility", icon: "heart" }, profile, { slug: "reports", label: "Reports", icon: "chart" }, assistant],
+  donor: [home(), { slug: "opportunities", label: "Opportunities", icon: "heart" }, { slug: "offers", label: "My offers", icon: "handshake" }, alerts, profile, assistant, { slug: "analytics", label: "My activity", icon: "chart" }],
+  requester: [home(), { slug: "requests", label: "My requests", icon: "list" }, { slug: "new-request", label: "New request", icon: "plus" }, alerts, profile, assistant, { slug: "analytics", label: "Insights", icon: "chart" }],
+  admin: [home("Overview", "chart"), { slug: "review", label: "Review queue", icon: "list" }, { slug: "requests", label: "Requests", icon: "file" }, { slug: "users", label: "Users", icon: "users" }, alerts, { slug: "donors", label: "Eligibility", icon: "heart" }, profile, { slug: "reports", label: "Analytics & reports", icon: "chart" }, assistant],
 };

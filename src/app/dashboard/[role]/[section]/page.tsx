@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { NewRequestView, NotificationsPage, OpportunitiesView, ProfileView, RequestsView, Title } from "@/components/dashboard/real/views";
 import { AdminDonors, AdminRequestsList, AdminReviewQueue, AdminUsers, DonorOffers } from "@/components/dashboard/real/workflow-views";
+import { AdminAnalytics, DonorAnalytics, RequesterAnalytics } from "@/components/analytics/views";
 import { AssistantChat } from "@/components/assistant/chat";
 import { requireRole } from "@/lib/auth";
 import { isRole, NAV } from "@/lib/nav";
@@ -21,6 +22,9 @@ export default async function Section({ params, searchParams }: PageProps<"/dash
   if (role === "donor" && section === "offers") return <DonorOffers />;
   if (role === "requester" && section === "new-request") return <NewRequestView s={s} />;
   if (role === "requester" && section === "requests") return <RequestsView />;
+  if (role === "admin" && section === "reports") return <AdminAnalytics sp={sp} />;
+  if (role === "donor" && section === "analytics") return <DonorAnalytics sp={sp} />;
+  if (role === "requester" && section === "analytics") return <RequesterAnalytics sp={sp} />;
   if (role === "admin" && section === "review") return <AdminReviewQueue />;
   if (role === "admin" && section === "requests") return <AdminRequestsList status={one("status")} />;
   if (role === "admin" && section === "users") return <AdminUsers me={s.profile.id} q={one("q")} />;

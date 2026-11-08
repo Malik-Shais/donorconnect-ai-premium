@@ -91,3 +91,6 @@ CSP: same-origin everywhere, connections only to this origin and the Supabase AP
 5. ✅ Gemini conversational assistant (server-side, read-only role-bound tools, safety layers).
 6. Advanced analytics and reports.
 7. Hardening: accessibility audit, Lighthouse PWA, CI, production email/SMTP and auth settings.
+
+## Stage 6: analytics and reporting
+See [STAGE6-ANALYTICS.md](STAGE6-ANALYTICS.md): metric definitions, denominators, missing-data rules, the read-only SQL functions, suppression thresholds, export security and tests.

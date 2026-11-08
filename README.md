@@ -4,7 +4,11 @@ Blood donor coordination platform. **Next.js 16 (App Router) · React 19 · Type
 
 > Matching is preliminary. The app never diagnoses, never makes transfusion decisions and never decides donor eligibility. Eligibility is a status recorded by authorised staff; **no donation interval is hard-coded anywhere.**
 
-## Status: Stage 5 (Gemini AI assistant)
+## Status: Stage 6 (analytics and reporting; see [docs/STAGE6-ANALYTICS.md](docs/STAGE6-ANALYTICS.md))
+
+Stage 6 adds role-specific analytics (`/dashboard/{admin/reports,donor/analytics,requester/analytics}`) and audited CSV exports. Stage 5 notes follow.
+
+### Stage 5 (Gemini AI assistant)
 | Area | State |
 |---|---|
 | Landing, design system, PWA, demo mode (`/demo/*`) | done |
