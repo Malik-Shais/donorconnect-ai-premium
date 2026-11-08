@@ -49,8 +49,18 @@ begin
 end $$;
 create trigger t_notification_event after insert on public.notifications for each row execute function public.emit_notification_event();
 
+-- Default deny. The only way to read realtime.messages is this policy, which requires BOTH:
+--   (1) the topic the session is joined to is "notif:<uid>", where uid comes from the signature-verified JWT (never from the client), and
+--   (2) the ROW being read belongs to that same topic (so a session can never read another topic's rows, whatever it claims).
 create policy notif_topic_receive on realtime.messages for select to authenticated
-  using (realtime.messages.extension = 'broadcast' and (select realtime.topic()) = 'notif:' || (select auth.uid())::text);
+  using (
+    realtime.messages.extension = 'broadcast'
+    and realtime.messages.topic = (select realtime.topic())
+    and (select realtime.topic()) = 'notif:' || (select auth.uid())::text
+  );
+-- There is deliberately NO insert/update/delete policy: with RLS enabled that is default-deny, so app roles can never write
+-- (only the SECURITY DEFINER trigger via realtime.send publishes). Table grants belong to the Realtime service role; the dev stack
+-- tightens them as supabase_admin (scripts/stack.mjs). RLS above is the authoritative control either way.
 
 -- ================= optional email: private outbox (no app role can read or write it) =================
 create table public.email_outbox (

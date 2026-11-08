@@ -58,3 +58,4 @@ supabase/.env.dev
 # keep the documented template tracked, ignore real env files
 !.env.example
 .env.test.local
+.env.worker

@@ -54,6 +54,8 @@ if (cmd === "up") {
   psql(["-c", "create schema if not exists _realtime; alter schema _realtime owner to supabase_admin"], undefined, "supabase_admin");
   dc("up", "-d", "realtime"); await waitFor("realtime schema", () => psql(["-c", "select 1 from realtime.messages limit 0"]).status === 0);
   migrate();
+  // Defence in depth on top of RLS (needs the table's grantor): app roles never write realtime.messages, anon never reads it.
+  psql(["-q", "-c", "revoke insert, update, delete on realtime.messages from anon, authenticated; revoke select on realtime.messages from anon"], undefined, "supabase_admin");
   dc("up", "-d", "rest", "gateway");
   dc("restart", "gateway"); // pick up nginx config changes
   const e = env();
@@ -66,6 +68,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=${e.SUPABASE_ANON_KEY}
 TEST_DATABASE_URL=postgres://postgres:${e.POSTGRES_PASSWORD}@127.0.0.1:54322/postgres
 MAILPIT_URL=http://127.0.0.1:54324
 `);
+  writeFileSync(".env.worker", `# generated (git-ignored): optional dev email worker. Local SMTP (Mailpit) only; no production SMTP is configured.\nDATABASE_URL=postgres://postgres:${e.POSTGRES_PASSWORD}@127.0.0.1:54322/postgres\nEMAIL_SMTP_URL=smtp://127.0.0.1:54325\nSITE_URL=http://localhost:3100\n`);
   console.log("Stack is up. API http://127.0.0.1:54321  Mail UI http://127.0.0.1:54324  DB 127.0.0.1:54322");
 } else if (cmd === "migrate") migrate();
 else if (cmd === "down") dc("down");

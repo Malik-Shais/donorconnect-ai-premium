@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { NAV, ROLES, type NavItem, type Role } from "@/lib/nav";
 import { devNotifications } from "@/lib/dev-data";
 import { logoutAction } from "@/app/actions/auth";
+import { NotificationsProvider, useNotifications } from "@/components/notifications/provider";
 
 const ICONS = { home: Home, heart: HeartPulse, handshake: Handshake, user: UserRound, list: ListChecks, plus: PlusCircle, sparkles: Sparkles, bell: Bell, users: Users, chart: BarChart3, file: FileText };
 
@@ -29,7 +30,7 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
     </nav>
   );
 
-  return (
+  const body = (
     <div className="min-h-dvh md:grid md:grid-cols-[250px_1fr]">
       <aside className="sticky top-0 hidden h-dvh flex-col gap-1 bg-navy p-4 md:flex">
         <div className="px-2 pb-5 pt-1"><Brand light href="/" /></div>
@@ -40,7 +41,7 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
               <Link key={i.slug} href={href(i)} aria-current={current(i) ? "page" : undefined}
                 className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3.5 font-medium transition-colors", current(i) ? "bg-gradient-to-br from-burgundy to-coral-dark text-white" : "text-slate-300 hover:bg-white/10")}>
                 <Icon className="size-5" aria-hidden /> {i.label}
-                {i.icon === "bell" && unread > 0 && <span className="ml-auto rounded-full bg-coral px-2 text-xs font-bold text-white">{unread}</span>}
+                {i.icon === "bell" && <UnreadBadge fallback={unread} />}
               </Link>
             );
           })}
@@ -76,6 +77,12 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
       </div>
     </div>
   );
+  return demo ? body : <NotificationsProvider initialUnread={unreadProp}>{body}</NotificationsProvider>;
+}
+
+function UnreadBadge({ fallback }: { fallback: number }) {
+  const n = useNotifications(), count = n ? n.unread : fallback;
+  return count > 0 ? <span data-testid="unread-badge" aria-label={`${count} unread`} className="ml-auto rounded-full bg-coral px-2 text-xs font-bold text-white md:static">{count}</span> : null;
 }
 
 function Account({ user, compact, profileHref }: { user?: ShellUser; compact?: boolean; profileHref?: string }) {

@@ -10,6 +10,8 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (!parsed.success) return { fields: fieldErrors(parsed.error) };
   const v = parsed.data;
   const supabase = await createClient();
+  const lim = await supabase.rpc("check_rate_limit", { p_action: "profile.update" });
+  if (lim.error) return { error: lim.error.code === "PT429" ? lim.error.message : "Please try again in a moment." };
   const { error } = await supabase.from("profiles").update({ full_name: v.full_name, city: v.city, phone: v.phone ?? null }).eq("id", session.profile.id);
   if (error) return { error: "We couldn't save your profile. Please try again." };
   if (session.profile.role === "donor") {
@@ -30,8 +32,3 @@ export async function setAvailabilityAction(available: boolean): Promise<{ ok: b
   return { ok: !error };
 }
 
-export async function markNotificationsReadAction() {
-  const session = await requireSession();
-  await (await createClient()).from("notifications").update({ is_read: true }).eq("user_id", session.profile.id).eq("is_read", false);
-  revalidatePath("/dashboard", "layout");
-}

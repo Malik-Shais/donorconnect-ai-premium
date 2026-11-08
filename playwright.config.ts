@@ -5,6 +5,7 @@ config({ path: ".env.local", quiet: true }); config({ path: ".env.test.local", q
 const launchOptions = { executablePath: process.env.CHROMIUM_PATH || undefined, args: ["--no-sandbox"] };
 export default defineConfig({
   testDir: "tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   workers: 2,
   webServer: { command: "npm run start -- -p 3100", url: "http://localhost:3100", reuseExistingServer: true, timeout: 60_000 },
   use: { baseURL: "http://localhost:3100", trace: "off" },

@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Stage 4: notification categories/preferences, realtime pings, private outbox, persistent rate limits, LIVE Supabase Realtime.
 import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, describe, expect, it } from "vitest";
 import { approve, as, DB_URL, getAdmin, makeApprovedRequest, makeDonor, makeRequest, makeRequester, pool, root } from "./helpers";
 
@@ -42,6 +42,8 @@ d("notification categories, preferences and ping events", () => {
     expect(await readAs(b, `notif:${a}`)).toHaveLength(0); // b claims a's topic: denied
     expect(await readAs(b, `notif:${b}`)).toHaveLength(0);
     await expect(as(null, (q) => q("select * from realtime.messages"))).rejects.toThrow(/permission denied/);
+    for (const stmt of ["update realtime.messages set payload='{}'", "delete from realtime.messages"])
+      for (const who of [a, null]) await expect(as(who, (q) => q(stmt))).rejects.toThrow(/permission denied|row-level security/); // writes are default-deny
     await expect(as(a, (q) => q("insert into realtime.messages (topic, extension, payload, event, private) values ($1,'broadcast','{}','x',true)", [`notif:${a}`]))).rejects.toThrow(/permission denied|row-level security/);
   });
 
@@ -110,8 +112,14 @@ d("persistent, atomic rate limits", () => {
 
   it("invitations and contact disclosure are limited; the original functions are not callable directly", async () => {
     const c = city(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+", c);
-    for (let i = 0; i < 10; i++) await as(req, (q) => q("select public.invite_donors($1)", [id]));
-    await expect(as(req, (q) => q("select public.invite_donors($1)", [id]))).rejects.toThrow(/too often/);
+    // Each invitation click inserts up to 20 offers and offer creation is limited to 100/hour, so abuse is cut off after a few clicks (never more than 10).
+    let allowed = 0, blocked = "";
+    for (let i = 0; i < 12 && !blocked; i++) {
+      try { await as(req, (q) => q("select public.invite_donors($1)", [id])); allowed++; } catch (e) { blocked = String(e); }
+    }
+    expect(blocked).toMatch(/too often\. Please try again in \d+ (seconds|minutes)/);
+    expect(allowed).toBeGreaterThanOrEqual(1);
+    expect(allowed).toBeLessThanOrEqual(10);
     const req2 = await makeRequester(), id2 = await makeApprovedRequest(req2, "A+", c);
     for (let i = 0; i < 60; i++) await as(req2, (q) => q("select * from public.owner_request_offers($1)", [id2]));
     await expect(as(req2, (q) => q("select * from public.owner_request_offers($1)", [id2]))).rejects.toThrow(/too often/);
@@ -154,7 +162,7 @@ d("LIVE Supabase Realtime: private per-user channels, ids only", () => {
     return { c, id: data.user!.id };
   }
   /** Join a private topic; resolves with the final subscribe status. */
-  const join = (c: ReturnType<typeof createClient>, topic: string, sink: unknown[]) => new Promise<string>((res) => {
+  const join = (c: SupabaseClient, topic: string, sink: unknown[]) => new Promise<string>((res) => {
     c.channel(topic, { config: { private: true } }).on("broadcast", { event: "notification" }, (m) => sink.push(m.payload)).subscribe((s) => { if (["SUBSCRIBED", "CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(s)) res(s); });
   });
 
