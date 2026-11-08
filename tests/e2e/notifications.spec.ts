@@ -42,6 +42,8 @@ test.describe("notification center", () => {
     await expect(donor.page.getByTestId("unread-summary")).toHaveText("You're all caught up.");
     await expect(donor.page.getByText("No notifications match this filter.")).toBeVisible(); // Unread filter is now empty
     await expect(badge(donor.page)).toHaveCount(0);
+    // The UI updates optimistically and Server Actions run one at a time: wait until the server has really persisted it before reloading.
+    await expect.poll(async () => (await (await donor.page.request.get("/api/notifications")).json()).unread).toBe(0);
     await donor.page.reload(); // persisted server-side
     await expect(donor.page.getByTestId("unread-summary")).toHaveText("You're all caught up.");
     for (const u of [donor, admin]) await u.ctx.close();
@@ -161,7 +163,7 @@ test.describe("rate limits (database-backed)", () => {
     const email = uniq("regrl");
     for (let i = 0; i < 5; i++) {
       await register(page, { email });
-      await page.waitForLoadState("networkidle");
+      await Promise.race([page.waitForURL(/dashboard/), page.locator("form [role=alert]").first().waitFor()]); // outcome, not network idle (the dashboard keeps a live socket open)
       await page.context().clearCookies(); // each attempt is a fresh visitor; the first creates the account, the rest are "already exists"
     }
     await register(page, { email });
