@@ -69,20 +69,28 @@ jobs:
         run: npm run test:db
         env: { REQUIRE_SERVICES: "1" }
       - name: Playwright (desktop + mobile) - journeys, analytics, axe, keyboard, PWA, responsive
-        run: npm run test:e2e -- --trace off
+        run: |
+          set -o pipefail
+          npm run test:e2e -- --trace off 2>&1 | tee playwright.log     # full output kept for the artifact; no retries (a flaky test must stay visible)
         env: { REQUIRE_SERVICES: "1" }
       - name: Container status and logs on failure (service logs only; no environment is printed)
         if: failure()
         run: |
           docker ps -a --format '{{.Names}} {{.Status}}'
-          for c in $(docker ps -a --format '{{.Names}}'); do echo "::group::$c"; docker logs --tail 40 "$c" 2>&1 | sed -E 's/(eyJ[A-Za-z0-9_-]{10,})/<jwt>/g'; echo "::endgroup::"; done
+          for c in $(docker ps -a --format '{{.Names}}'); do echo "::group::$c"; docker logs --tail 25 "$c" 2>&1 | cut -c1-300 | sed -E 's/(eyJ[A-Za-z0-9_-]{10,})/<jwt>/g'; echo "::endgroup::"; done
       - name: Stop the stack
         if: always()
         run: node scripts/stack.mjs down
-      - name: Upload failure report (no traces; fictional data)
+      - name: Playwright failure summary (printed last so it is the end of the job log)
+        if: failure()
+        run: |
+          echo "=== totals ==="; grep -E "^\s+[0-9]+ (passed|failed|skipped|flaky|did not run)" playwright.log || echo "(no Playwright totals: the run did not finish)"
+          echo "=== failed tests ==="; grep -E "^\s+[0-9]+\) \[" playwright.log | sort -u | head -40 || true
+          echo "=== first errors ==="; grep -E -A7 "^\s+[0-9]+\) \[" playwright.log | cut -c1-260 | head -90 || true
+      - name: Upload failure report (Playwright output + results; fictional data, no traces)
         if: failure()
         uses: actions/upload-artifact@v4
-        with: { name: playwright-report, path: test-results, retention-days: 7, if-no-files-found: ignore }
+        with: { name: playwright-report, path: "test-results\nplaywright.log", retention-days: 7, if-no-files-found: ignore }
 
   fresh-database:
     name: Fresh-database verification (all migrations on an empty database)
