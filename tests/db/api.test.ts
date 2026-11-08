@@ -4,9 +4,10 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL, ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-if (!URL_ || !ANON) console.warn("\n⚠ Supabase env not set: live API tests SKIPPED (run `npm run db:up` first)\n");
-const d = URL_ && ANON ? describe : describe.skip;
+const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL, ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, DB = process.env.TEST_DATABASE_URL;
+// A public URL alone is not a running stack: require the database too (the stack generates all three together).
+if (!URL_ || !ANON || !DB) console.warn("\n⚠ Supabase env not set: live API tests SKIPPED (run `npm run db:up` first)\n");
+const d = URL_ && ANON && DB ? describe : describe.skip;
 
 type Json = Record<string, unknown>;
 const req = async (path: string, token: string | null, init: RequestInit = {}) => {

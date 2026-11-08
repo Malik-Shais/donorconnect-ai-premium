@@ -16,7 +16,7 @@
 | _not yet performed_ | | | no hosted project exists |
 
 ## GitHub distribution
-1. Repository settings: protect `main` (require pull request, the CI jobs `Lint, typecheck, unit tests, secret scan`, `Production build`, `Isolated stack, DB tests and browser tests`, and one review); enable Dependabot alerts and secret scanning with push protection; enable private vulnerability reporting.
+1. Repository settings: protect `main` (require pull request, the single status check **`CI gate (all required jobs)`** (it fails unless every CI job succeeded; see docs/CI.md), and one review); enable Dependabot alerts and secret scanning with push protection; enable private vulnerability reporting.
 2. Review and merge pull request #1 **only after the owner approves** (it has deliberately been left open). Squash or merge-commit is a team choice; keep the history if you want the stage checkpoints (`checkpoint/premium-stage-2` ... `-6`).
 3. Tag from `main`: `git tag -a v2.0.0-rc1 -m "Release candidate 1" && git push origin v2.0.0-rc1`, then **Releases -> Draft a new release** (pre-release), generate notes, attach nothing secret. Release notes must state what is development-tested vs production-verified (currently: nothing is production-verified).
 4. Deploy from the tag to **staging** first (docs/DEPLOYMENT.md). Production only after the blockers are closed.

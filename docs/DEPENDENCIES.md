@@ -1,6 +1,6 @@
 # Dependency and security review
 
-Policy: patch/minor updates may be grouped (Dependabot, weekly); **major upgrades are never automatic** and are tested by hand. CI runs `npm audit --omit=dev --audit-level=high` (fails on high/critical production vulnerabilities) and GitHub's dependency-review on pull requests.
+Policy: patch/minor updates may be grouped (Dependabot, weekly); **major upgrades are never automatic** and are tested by hand. CI runs `npm audit --omit=dev --audit-level=high` (fails on high/critical production vulnerabilities) and GitHub's dependency-review on pull requests **where the repository supports it** (needs the dependency graph + GitHub Advanced Security on private repos; on this repository it is currently unavailable, so the workflow reports "NOT RUN" with a warning while the production audit stays enforced; see docs/CI.md).
 
 ## Result at Stage 7 (npm audit, advisory data at the time of the run)
 * **Production dependencies: 0 known vulnerabilities.**

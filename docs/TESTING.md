@@ -69,7 +69,7 @@ Lab numbers, not field data: real-user Core Web Vitals are **NOT MEASURED**. Mob
 
 | Test | Needs |
 |---|---|
-| `npm run check`, unit tests | nothing |
+| `npm run check`, `npm test` (pure unit tests) | nothing |
 | `test:db`, `test:e2e`, `verify:fresh`, `load:test` | Docker (local stack; images from Docker Hub, rate limits apply) |
 | `test:live` | `GEMINI_API_KEY` + free-tier quota (manual; never in PR CI) |
 | Lighthouse | `npx lighthouse@12.8.2` + the bundled Chromium (`CHROME_PATH`) |
@@ -80,7 +80,7 @@ Determinism: fixtures are generated per test in unique cities/e-mails; the seed 
 ## Reproduce
 ```bash
 npm ci && npm run db:up && npm run db:seed
-npm run check && npm run test:db && npm run test:e2e && npm run verify:fresh
+npm run check && REQUIRE_SERVICES=1 npm run test:db && npm run test:e2e && npm run verify:fresh   # export CHROMIUM_PATH if Playwright's own Chromium is not installed
 GEMINI_MODEL=gemini-3.5-flash-lite npm run test:live          # optional, uses the free tier
 # load test (isolated stack on offset 200, never the dev database):
 export DC_PROJECT=donorconnect-load DC_PORT_OFFSET=200 DC_ENV_FILE=supabase/.env.load; node scripts/stack.mjs up

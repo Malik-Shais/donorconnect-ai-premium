@@ -30,9 +30,10 @@ Optional assistant: put `GEMINI_API_KEY=...` in `.env.local` (free tier; never c
 ## Commands
 | Command | Purpose | Needs |
 |---|---|---|
-| `npm run check` | lint + typecheck + unit tests + secret scan | nothing |
-| `npm test` | Vitest (DB suites skip with a warning if no stack) | optional stack |
-| `npm run test:db` | RLS, workflow, stage 4 (live WebSocket), email, analytics, hardening | stack |
+| `npm run check` | lint + typecheck + **pure unit tests** + secret scan | nothing |
+| `npm test` (= `test:unit`) | pure unit tests only (own Vitest config; no DB, no network, no `.env`) | nothing |
+| `npm run test:db` | RLS, workflow, stage 4 (live WebSocket), email, API, analytics, hardening. `REQUIRE_SERVICES=1` makes a missing service fail instead of skip | stack |
+| `npm run stack:health` | waits until PostgreSQL, GoTrue, PostgREST, Realtime and Mailpit all answer | stack |
 | `npm run test:e2e` | build + Playwright (desktop + mobile): journeys, analytics, axe, keyboard, PWA | stack |
 | `npm run verify:fresh` | all migrations on a brand-new **isolated** database + DB tests | Docker |
 | `npm run test:live` | real Gemini API (manual; needs `GEMINI_API_KEY`) | key + quota |
@@ -41,7 +42,7 @@ Optional assistant: put `GEMINI_API_KEY=...` in `.env.local` (free tier; never c
 
 ## Documentation
 [Architecture](docs/V2-ARCHITECTURE.md) · [Security & privacy review](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md) · [Testing & results](docs/TESTING.md) · [Analytics definitions](docs/STAGE6-ANALYTICS.md) ·
-[User guide](docs/USER_GUIDE.md) · [Admin guide](docs/ADMIN_GUIDE.md) · [Dependencies](docs/DEPENDENCIES.md) · [Release checklist](docs/RELEASE.md) · [Security policy](SECURITY.md)
+[User guide](docs/USER_GUIDE.md) · [Admin guide](docs/ADMIN_GUIDE.md) · [Dependencies](docs/DEPENDENCIES.md) · [CI](docs/CI.md) · [Release checklist](docs/RELEASE.md) · [Security policy](SECURITY.md)
 
 ## Database migrations
 `supabase/migrations/*.sql`, applied in filename order (10 files; core schema -> RLS -> functions -> workflow -> notifications/realtime/limits -> AI budget -> analytics -> hardening).
