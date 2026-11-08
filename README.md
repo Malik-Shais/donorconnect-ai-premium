@@ -1,35 +1,27 @@
-# DonorConnect AI Premium
+# DonorConnect AI Premium V2
 
-Mobile-first blood donor coordination web app. **Python · FastAPI · SQLite · vanilla HTML/CSS/JS.** Zero paid services.
+Blood donor coordination platform. **Next.js (App Router) · React · TypeScript · Tailwind CSS 4 · shadcn/ui-style components · Motion · Recharts · Supabase (planned) · Vitest · Playwright · PWA.**
 
-> Matching is *preliminary*. The app gives no medical diagnoses or transfusion decisions; hospitals and blood banks confirm everything.
+> Matching is preliminary. This app never diagnoses, never makes transfusion decisions and never decides donor eligibility. Blood services and clinicians do; no donation interval is hard-coded.
 
-## Features
-Premium landing page with live stats · secure register/login (scrypt hashing, HttpOnly SameSite cookie sessions, login lockout) · donor, requester and admin dashboards · donor availability + 56-day eligibility pause · blood-group (red-cell) + city matching · requests with status timeline · **consent-based contact sharing** (contact is released only when a donor accepts *and* ticks consent) · in-app notifications · supply/demand analytics, admin reports and CSV export · AI assistant (Google Gemini free tier via the Python backend, with an offline fallback and safety filters).
+## Status: stage 1 (foundation)
+Done: design system (burgundy, coral, teal, navy, off-white tokens), premium landing page with interactive compatibility guide, dashboard shell (desktop sidebar, mobile bottom tabs) for donor/requester/admin with **fictional** data and Recharts, validated login/register forms, installable PWA (manifest, icons, offline fallback), unit + e2e tests.
+Next: Supabase Auth + migrations + RLS, requests/offers/consent, realtime notifications, Gemini agent route, rate limiting. See `docs/V2-ARCHITECTURE.md`.
 
-## Run locally
+## Run
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env            # optional; add GEMINI_API_KEY for live AI
-python -m app.seed              # fictional demo data (optional)
-uvicorn app.main:app --reload
+npm install
+npm run dev            # http://localhost:3000
+npm run build && npm start -- -p 3100   # production preview
 ```
-Open **http://localhost:8000** (app) and **http://localhost:8000/docs** (Swagger UI).
+Preview dashboards: `/dashboard/donor`, `/dashboard/requester`, `/dashboard/admin`.
 
-Demo logins (fictional, password `Demo@12345`): `admin@demo.example`, `requester0@demo.example`, `donor1@demo.example`.
-Remote/cloud preview: forward port 8000 and open the forwarded URL.
-
-## Live AI (optional, free)
-Create a free key at https://aistudio.google.com/apikey, put it in `.env` as `GEMINI_API_KEY`. The key stays server-side and is never sent to the browser. Without a key (or if the API fails) the offline assistant answers. Never commit `.env`.
-
-## Tests
+## Test
 ```bash
-python -m pytest -q
+npm test               # Vitest
+npm run lint && npm run typecheck
+npm run test:e2e       # Playwright (desktop + mobile); uses the pre-installed Chromium via CHROMIUM_PATH
 ```
 
-## Layout
-`app/` backend (`routers/`, `matching.py`, `ai.py`, `security.py`, `db.py`, `seed.py`) · `static/` frontend · `tests/` · `docs/ARCHITECTURE.md` design, schema, screens, roadmap.
-
-## Known limits
-Rate limiting is in-memory (single process). SQLite suits a single node. Set `DC_COOKIE_SECURE=1` behind HTTPS. Demonstration software, not a certified medical system.
+## Previous prototype
+The FastAPI/SQLite version is preserved, unchanged, in `legacy/` (and on `main`, commit `8931be1`). It is frozen and no longer developed.

@@ -1,0 +1,74 @@
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Home, HeartPulse, Handshake, UserRound, ListChecks, PlusCircle, Sparkles, Bell, Users, BarChart3, FileText } from "lucide-react";
+import { Brand } from "@/components/brand";
+import { cn } from "@/lib/utils";
+import { NAV, ROLES, type NavItem, type Role } from "@/lib/nav";
+import { devNotifications } from "@/lib/dev-data";
+
+const ICONS = { home: Home, heart: HeartPulse, handshake: Handshake, user: UserRound, list: ListChecks, plus: PlusCircle, sparkles: Sparkles, bell: Bell, users: Users, chart: BarChart3, file: FileText };
+
+export function DashboardShell({ role, children }: { role: Role; children: React.ReactNode }) {
+  const path = usePathname();
+  const base = `/dashboard/${role}`;
+  const items = NAV[role];
+  const href = (i: NavItem) => (i.slug ? `${base}/${i.slug}` : base);
+  const current = (i: NavItem) => path === href(i);
+  const unread = devNotifications.length;
+
+  const Role = (
+    <nav aria-label="Preview role" className="flex w-fit gap-1 rounded-full bg-white/10 p-1 text-xs">
+      {ROLES.map((r) => (
+        <Link key={r} href={`/dashboard/${r}`} aria-current={r === role ? "true" : undefined}
+          className={cn("rounded-full px-3 py-1.5 font-semibold capitalize", r === role ? "bg-white text-navy" : "text-slate-300 hover:text-white")}>{r}</Link>
+      ))}
+    </nav>
+  );
+
+  return (
+    <div className="min-h-dvh md:grid md:grid-cols-[250px_1fr]">
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-1 bg-navy p-4 md:flex">
+        <div className="px-2 pb-5 pt-1"><Brand light href="/" /></div>
+        <nav aria-label="Main" className="flex flex-col gap-1">
+          {items.map((i) => {
+            const Icon = ICONS[i.icon];
+            return (
+              <Link key={i.slug} href={href(i)} aria-current={current(i) ? "page" : undefined}
+                className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3.5 font-medium transition-colors", current(i) ? "bg-gradient-to-br from-burgundy to-coral-dark text-white" : "text-slate-300 hover:bg-white/10")}>
+                <Icon className="size-5" aria-hidden /> {i.label}
+                {i.icon === "bell" && <span className="ml-auto rounded-full bg-coral px-2 text-xs font-bold text-white">{unread}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mt-auto space-y-2 p-2">
+          <p className="text-xs text-slate-400">Development preview role</p>{Role}
+        </div>
+      </aside>
+
+      <div className="min-w-0">
+        <header className="sticky top-0 z-20 flex flex-col gap-2 bg-navy px-4 py-3 md:hidden">
+          <Brand light /> {Role}
+        </header>
+        <main id="main" className="px-4 pb-28 pt-6 md:px-10 md:pb-10 md:pt-9">
+          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+            Development preview with <b>fictional data</b>. Authentication and live data arrive in the next stage.
+          </p>
+          {children}
+        </main>
+        <nav aria-label="Mobile" className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-line bg-white px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 md:hidden">
+          {items.slice(0, 5).map((i) => {
+            const Icon = ICONS[i.icon];
+            return (
+              <Link key={i.slug} href={href(i)} aria-current={current(i) ? "page" : undefined}
+                className={cn("flex min-h-12 min-w-14 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.68rem]", current(i) ? "font-bold text-burgundy" : "text-muted")}>
+                <Icon className="size-5" aria-hidden /> {i.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
+  );
+}
