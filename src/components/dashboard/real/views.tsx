@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, CheckCheck, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { rpc } from "@/lib/rpc";
 import { Kpi, KpiGrid } from "@/components/dashboard/kpi";
@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { GROUPS, canGiveTo, canReceiveFrom } from "@/lib/compat";
 import { acceptRequestAction } from "@/app/actions/workflow";
-import { markNotificationsReadAction, setAvailabilityAction } from "@/app/actions/profile";
-import type { BloodRequest, Notification, OpenReq, RequestStatus, Session } from "@/lib/types";
+import { setAvailabilityAction } from "@/app/actions/profile";
+import { NotificationCenter } from "@/components/notifications/center";
+import type { BloodRequest, OpenReq, RequestStatus, Session } from "@/lib/types";
 
 export const Title = ({ children }: { children: React.ReactNode }) => <h1 className="mb-5 text-3xl font-bold">{children}</h1>;
 export const Empty = ({ children }: { children: React.ReactNode }) => <p className="rounded-xl bg-offwhite px-4 py-6 text-center text-sm text-muted">{children}</p>;
@@ -154,18 +155,7 @@ export async function OpportunitiesView({ s, group, city }: { s: Session; group?
   );
 }
 
-export async function NotificationsView() {
-  const { data } = await (await createClient()).from("notifications").select("id,message,link,is_read,created_at").order("created_at", { ascending: false }).limit(50);
-  const items = (data ?? []) as Notification[];
-  const unread = items.some((i) => !i.is_read);
-  return (
-    <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-bold">Notifications</h1>
-        {unread && <form action={markNotificationsReadAction}><Button size="sm" variant="outline"><CheckCheck aria-hidden /> Mark all read</Button></form>}</div>
-      {items.length ? <ul className="grid gap-3">{items.map((n) => (
-        <li key={n.id} className={`flex items-start justify-between gap-3 rounded-2xl border bg-white p-4 shadow-card ${n.is_read ? "border-line" : "border-l-4 border-coral"}`}>
-          <span>{n.link ? <Link href={n.link} className="hover:underline">{n.message}</Link> : n.message}</span><span className="shrink-0 text-xs text-muted">{date(n.created_at)}</span></li>))}</ul>
-        : <Card><Empty><Bell className="mx-auto mb-2 size-6" aria-hidden />You&apos;re all caught up.</Empty></Card>}
-    </>
-  );
+export async function NotificationsPage({ role }: { role: string }) {
+  const { data } = await (await createClient()).from("notification_preferences").select("email_enabled,email_categories").maybeSingle();
+  return <NotificationCenter role={role} prefs={data ?? { email_enabled: false, email_categories: ["request", "offer", "invitation"] }} />;
 }

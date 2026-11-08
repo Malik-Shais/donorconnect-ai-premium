@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function rpc<T = unknown>(fn: string, args: Record<string, unknown> = {}): Promise<{ data?: T; error?: string }> {
   const { data, error } = await (await createClient()).rpc(fn, args);
   if (!error) return { data: data as T };
-  if (error.code === "P0001") return { error: error.message };
+  if (error.code === "P0001" || error.code === "PT429") return { error: error.message }; // business rules and rate limits are written to be user-safe
   if (error.code === "42501" || error.code === "28000") return { error: "You are not allowed to do that." };
   return { error: "Something went wrong. Please try again." };
 }

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured, safeNext } from "@/lib/env";
+import { anonLimit, globalLimit } from "@/lib/ratelimit";
 import { fieldErrors, forgotSchema, loginSchema, registerSchema, resetSchema, type FormState } from "@/lib/validation";
 
 const NOT_CONFIGURED: FormState = { error: "The backend is not configured yet. See the README (npm run db:up)." };
@@ -22,6 +23,8 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   const parsed = registerSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { fields: fieldErrors(parsed.error), values: keep(fd, "password") };
   const { email, password, role, full_name, city, phone, blood_group } = parsed.data;
+  const blocked = (await globalLimit("auth.register")) ?? (await anonLimit("auth.register", email));
+  if (blocked) return { error: blocked, values: keep(fd, "password") };
   const supabase = await createClient();
   // Metadata is client-controlled by nature; the database trigger clamps the role to donor/requester regardless.
   const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { role, full_name, city, phone: phone ?? "", blood_group } } });
@@ -34,9 +37,14 @@ export async function loginAction(_: FormState, fd: FormData): Promise<FormState
   if (!isSupabaseConfigured()) return NOT_CONFIGURED;
   const parsed = loginSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { fields: fieldErrors(parsed.error), values: keep(fd, "password") };
+  const blocked = (await globalLimit("auth.login")) ?? (await anonLimit("auth.login", parsed.data.email, false)); // peek: successes never consume the per-email quota
+  if (blocked) return { error: blocked, values: keep(fd, "password") };
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: friendly(error), values: keep(fd, "password") };
+  if (error) {
+    await anonLimit("auth.login", parsed.data.email); // count failures only
+    return { error: friendly(error), values: keep(fd, "password") };
+  }
   redirect(safeNext(fd.get("next")));
 }
 
@@ -50,6 +58,8 @@ export async function forgotAction(_: FormState, fd: FormData): Promise<FormStat
   if (!isSupabaseConfigured()) return NOT_CONFIGURED;
   const parsed = forgotSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { fields: fieldErrors(parsed.error), values: keep(fd) };
+  const blocked = (await globalLimit("auth.forgot")) ?? (await anonLimit("auth.forgot", parsed.data.email));
+  if (blocked) return { error: blocked, values: keep(fd) };
   const h = await headers();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
   const supabase = await createClient();

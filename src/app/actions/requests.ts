@@ -13,6 +13,7 @@ export async function createRequestAction(_: FormState, fd: FormData): Promise<F
   const v = parsed.data;
   // Status is not insertable by users: the database forces 'pending_review' (RLS + default).
   const { data, error } = await (await createClient()).from("blood_requests").insert({ ...v, needed_by: v.needed_by ?? null, note: v.note ?? null, requester_id: session.profile.id }).select("id").single();
+  if (error?.code === "PT429") return { error: error.message, values }; // database-enforced rate limit
   if (error || !data) return { error: "We couldn't submit your request. Please try again.", values };
   revalidatePath("/dashboard", "layout");
   redirect(`/dashboard/requester/requests/${data.id}?submitted=1`);
