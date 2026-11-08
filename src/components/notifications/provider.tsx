@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/app/actions/notifications";
 
@@ -22,12 +22,18 @@ export function NotificationsProvider({ initialUnread, children }: { initialUnre
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const seq = useRef(0);       // only the newest response may be applied (out-of-order responses are dropped)
+  const inFlight = useRef(0);  // while a mark-read mutation is running, any response may predate it, so it is dropped and we re-sync afterwards
+
   const refresh = useCallback(async () => {
+    const mine = ++seq.current;
     try {
       const r = await fetch("/api/notifications", { cache: "no-store" });
+      if (mine !== seq.current || inFlight.current > 0) return;
       if (r.status === 401) { setError("Your session has expired. Please sign in again."); return; }
       if (!r.ok) throw new Error("bad status");
       const d = (await r.json()) as { items: Notif[]; unread: number };
+      if (mine !== seq.current || inFlight.current > 0) return;
       setItems(d.items); setUnread(d.unread); setError(null);
     } catch {
       setError(navigator.onLine ? "We couldn't refresh your notifications." : null); // offline is shown by its own banner
@@ -79,13 +85,15 @@ export function NotificationsProvider({ initialUnread, children }: { initialUnre
   const markRead = useCallback(async (id: number) => {
     setItems((l) => l.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     setUnread((u) => Math.max(0, u - 1));
-    const r = await markNotificationReadAction(id);
-    if (!r.ok) void refresh();
+    inFlight.current++;
+    try { await markNotificationReadAction(id); } finally { inFlight.current--; }
+    void refresh(); // re-sync with the server's truth once the write has landed
   }, [refresh]);
   const markAll = useCallback(async () => {
     setItems((l) => l.map((n) => ({ ...n, is_read: true }))); setUnread(0);
-    const r = await markAllNotificationsReadAction();
-    if (!r.ok) void refresh();
+    inFlight.current++;
+    try { await markAllNotificationsReadAction(); } finally { inFlight.current--; }
+    void refresh();
   }, [refresh]);
 
   const value = useMemo(() => ({ items, unread, status, loading, error, refresh, markRead, markAll }), [items, unread, status, loading, error, refresh, markRead, markAll]);

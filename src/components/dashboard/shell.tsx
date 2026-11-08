@@ -68,8 +68,9 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
             const Icon = ICONS[i.icon];
             return (
               <Link key={i.slug} href={href(i)} aria-current={current(i) ? "page" : undefined}
-                className={cn("flex min-h-12 min-w-14 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.68rem]", current(i) ? "font-bold text-burgundy" : "text-muted")}>
+                className={cn("relative flex min-h-12 min-w-14 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.68rem]", current(i) ? "font-bold text-burgundy" : "text-muted")}>
                 <Icon className="size-5" aria-hidden /> {i.label}
+                {i.icon === "bell" && <UnreadBadge fallback={unread} className="absolute right-1 top-0 min-w-5 px-1 text-center text-[0.65rem]" />}
               </Link>
             );
           })}
@@ -80,9 +81,9 @@ export function DashboardShell({ role, children, demo = false, user, unread: unr
   return demo ? body : <NotificationsProvider initialUnread={unreadProp}>{body}</NotificationsProvider>;
 }
 
-function UnreadBadge({ fallback }: { fallback: number }) {
+function UnreadBadge({ fallback, className }: { fallback: number; className?: string }) {
   const n = useNotifications(), count = n ? n.unread : fallback;
-  return count > 0 ? <span data-testid="unread-badge" aria-label={`${count} unread`} className="ml-auto rounded-full bg-coral px-2 text-xs font-bold text-white md:static">{count}</span> : null;
+  return count > 0 ? <span data-testid="unread-badge" aria-label={`${count} unread`} className={cn("rounded-full bg-coral px-2 text-xs font-bold text-white", className ?? "ml-auto")}>{count}</span> : null;
 }
 
 function Account({ user, compact, profileHref }: { user?: ShellUser; compact?: boolean; profileHref?: string }) {
