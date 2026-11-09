@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
+import { timed } from "@/lib/perf";
 import type { Role } from "@/lib/nav";
 import type { DonorProfile, Profile, Session } from "@/lib/types";
 
@@ -10,12 +11,16 @@ import type { DonorProfile, Profile, Session } from "@/lib/types";
 export const getSession = cache(async (): Promise<Session | null> => {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from("profiles").select("*, donor_profiles!user_id(*)").eq("id", user.id).maybeSingle();
+  // getClaims() verifies the access token's signature locally against the project's cached public keys (no network call). Projects that still use a
+  // shared-secret JWT fall back to a getUser() round trip inside the library, so behaviour is the same, only slower. The role, suspension and every
+  // permission still come from Postgres (profiles + RLS) on each request, exactly as before.
+  const { data: auth } = await timed("auth.claims", () => supabase.auth.getClaims());
+  const claims = auth?.claims;
+  if (!claims?.sub) return null;
+  const { data } = await timed("auth.profile", async () => supabase.from("profiles").select("*, donor_profiles!user_id(*)").eq("id", claims.sub).maybeSingle());
   if (!data) return null;
   const { donor_profiles, ...profile } = data as Profile & { donor_profiles: DonorProfile | null };
-  return { email: user.email ?? "", profile, donor: donor_profiles };
+  return { email: typeof claims.email === "string" ? claims.email : "", profile, donor: donor_profiles };
 });
 
 export async function requireSession(): Promise<Session> {

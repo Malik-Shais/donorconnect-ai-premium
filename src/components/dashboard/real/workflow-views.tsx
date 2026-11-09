@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/dashboard/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Mail, Phone, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

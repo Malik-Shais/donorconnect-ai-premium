@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/dashboard/link";
 import { Info } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { rpc } from "@/lib/rpc";

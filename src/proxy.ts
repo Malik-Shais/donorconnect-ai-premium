@@ -17,9 +17,9 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  const { data: { user } } = await supabase.auth.getUser(); // validates the JWT with the auth server
+  const { data: auth } = await supabase.auth.getClaims(); // verifies the JWT locally (refreshes an expired session first); no auth-server round trip
   const { pathname, search } = request.nextUrl;
-  if (!user && pathname.startsWith("/dashboard")) {
+  if (!auth?.claims?.sub && pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(pathname + search)}`;

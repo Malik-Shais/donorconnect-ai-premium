@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/dashboard/link";
 import { cn } from "@/lib/utils";
 
 export const Drop = ({ className }: { className?: string }) => (

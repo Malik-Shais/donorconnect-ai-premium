@@ -9,17 +9,18 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   const parsed = profileSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { fields: fieldErrors(parsed.error) };
   const v = parsed.data;
+  if (session.profile.role === "donor" && !v.blood_group) return { fields: { blood_group: "Choose your blood group" } }; // validate before any write
   const supabase = await createClient();
   const lim = await supabase.rpc("check_rate_limit", { p_action: "profile.update" });
   if (lim.error) return { error: lim.error.code === "PT429" ? lim.error.message : "Please try again in a moment." };
-  const { error } = await supabase.from("profiles").update({ full_name: v.full_name, city: v.city, phone: v.phone ?? null }).eq("id", session.profile.id);
-  if (error) return { error: "We couldn't save your profile. Please try again." };
-  if (session.profile.role === "donor") {
-    if (!v.blood_group) return { fields: { blood_group: "Choose your blood group" } };
-    const { error: e2 } = await supabase.from("donor_profiles")
-      .update({ blood_group: v.blood_group, available: v.available, last_donation_date: v.last_donation_date ?? null, notify_new_requests: v.notify_new_requests }).eq("user_id", session.profile.id);
-    if (e2) return { error: "We couldn't save your donor details. Please try again." };
-  }
+  // the two tables are independent rows, so both updates run at the same time (one network round trip instead of two)
+  const [base, donor] = await Promise.all([
+    supabase.from("profiles").update({ full_name: v.full_name, city: v.city, phone: v.phone ?? null }).eq("id", session.profile.id),
+    session.profile.role === "donor"
+      ? supabase.from("donor_profiles").update({ blood_group: v.blood_group, available: v.available, last_donation_date: v.last_donation_date ?? null, notify_new_requests: v.notify_new_requests }).eq("user_id", session.profile.id)
+      : Promise.resolve({ error: null })]);
+  if (base.error) return { error: "We couldn't save your profile. Please try again." };
+  if (donor.error) return { error: "We couldn't save your donor details. Please try again." };
   revalidatePath("/dashboard", "layout");
   return { message: "Profile saved." };
 }

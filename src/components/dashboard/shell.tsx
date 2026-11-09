@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/dashboard/link";
 import { usePathname } from "next/navigation";
 import { Home, HeartPulse, Handshake, UserRound, ListChecks, PlusCircle, Sparkles, Bell, Users, BarChart3, FileText } from "lucide-react";
 import { Brand } from "@/components/brand";

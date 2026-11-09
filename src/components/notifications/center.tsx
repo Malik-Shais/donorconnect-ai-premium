@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/dashboard/link";
 import { useActionState, useState } from "react";
 import { Bell, CheckCheck, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
