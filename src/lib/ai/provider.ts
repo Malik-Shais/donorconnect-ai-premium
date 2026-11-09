@@ -5,7 +5,7 @@ export type Part = { text: string } | { functionCall: { name: string; args: Reco
 export type Content = { role: "user" | "model"; parts: Part[] };
 export type ModelEvent = { type: "text"; text: string } | { type: "call"; name: string; args: Record<string, unknown>; thoughtSignature?: string };
 export type ToolDecl = { name: string; description: string; parametersJsonSchema: Record<string, unknown> };
-export type ModelRequest = { system: string; contents: Content[]; tools: ToolDecl[]; signal?: AbortSignal };
+export type ModelRequest = { system: string; contents: Content[]; tools: ToolDecl[]; allowTools?: boolean; signal?: AbortSignal };
 export type Provider = { name: "gemini" | "mock"; stream: (r: ModelRequest) => AsyncGenerator<ModelEvent> };
 
 // Model id comes from the environment. The default is the model used in the official @google/genai documentation; override with
@@ -16,13 +16,13 @@ function gemini(apiKey: string): Provider {
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Number(process.env.GEMINI_TIMEOUT_MS) || 25_000, retryOptions: { attempts: 1 } } }) // live check: an overloaded model stalled 160s+ behind SDK retries;
   return {
     name: "gemini",
-    async *stream({ system, contents, tools, signal }) {
+    async *stream({ system, contents, tools, allowTools = true, signal }) {
       const res = await ai.models.generateContentStream({
         model: MODEL(),
         contents,
         config: {
           systemInstruction: system, maxOutputTokens: 700, temperature: 0.3, abortSignal: signal,
-          ...(tools.length ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.AUTO } } } : {}),
+          ...(tools.length ? { tools: [{ functionDeclarations: tools }], toolConfig: { functionCallingConfig: { mode: allowTools ? FunctionCallingConfigMode.AUTO : FunctionCallingConfigMode.NONE } } } : {}),
         },
       });
       for await (const chunk of res) {

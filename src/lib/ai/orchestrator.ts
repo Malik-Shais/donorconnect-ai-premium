@@ -42,8 +42,11 @@ export async function* runAssistant({ role, message, history, provider, tools, e
   let all = "";
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
+      // Final round: besides forbidding calls, say so in the same turn as the tool results (a small model otherwise sometimes ignores the mode).
+      if (round === MAX_ROUNDS - 1) contents[contents.length - 1].parts.push({ text: "You now have the tool results. Answer the user's question in plain text now, briefly, without calling any tool." });
       const guard = new OutputGuard(), calls: Extract<ModelEvent, { type: "call" }>[] = [];
-      for await (const ev of provider.stream({ system, contents, tools, signal })) {
+      // Last round: calling is forbidden (function-calling mode NONE) so the model must answer from what it already fetched. Live check: a small model otherwise re-called the help tool 3x and never answered.
+      for await (const ev of provider.stream({ system, contents, tools, allowTools: round < MAX_ROUNDS - 1, signal })) {
         if (ev.type === "text") { const out = guard.push(ev.text); if (out) { all += out; yield { type: "delta", text: out }; } }
         else calls.push(ev);
       }

@@ -61,6 +61,13 @@ describe("orchestrator", () => {
     expect(p.seen.length).toBe(3);
     expect(text(ev)).toMatch(/couldn't finish/);
   });
+  it("a model that keeps fetching help is forbidden to call tools on the last round and must answer", async () => {
+    const seenAllowed: (boolean | undefined)[] = [];
+    const p: Provider = { name: "gemini", async *stream({ allowTools }) { seenAllowed.push(allowTools); if (allowTools !== false) yield { type: "call", name: "get_platform_help", args: { topic: "x" } }; else yield { type: "text", text: "Here is the answer from the help text." }; } };
+    const ev = await collect(base("donor", p, "how do I accept a request?"));
+    expect(seenAllowed).toEqual([true, true, false]);     // calling allowed twice, forbidden on round 3
+    expect(text(ev)).toMatch(/Here is the answer/); expect(text(ev)).not.toMatch(/couldn't finish/);
+  });
   it.each([[429, "quota"], [503, "unavailable"], [401, "auth"]])("provider HTTP %i is mapped to a safe message", async (status, code) => {
     const p: Provider = { name: "gemini", async *stream() { throw Object.assign(new Error("RAW SECRET API DETAIL key=AIza123"), { status }); } };
     const ev = await collect(base("donor", p, "hello"));
