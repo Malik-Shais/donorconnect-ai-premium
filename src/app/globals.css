@@ -38,9 +38,12 @@
 }
 
 html { scroll-behavior: smooth; overflow-x: clip; }
+/* Below md the dashboard has a sticky header (~5rem) and a fixed bottom nav (~4.5rem + safe area). Scroll padding keeps anything that is scrolled or focused into view clear of
+   both (WCAG 2.2 "Focus Not Obscured"), so buttons never end up hidden under the bars. */
+@media (max-width: 767px) { html { scroll-padding-top: 5.5rem; scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom)); } }
 body { background: var(--offwhite); color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { font-family: var(--font-display); color: var(--navy); }
 :focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important; }
 }

@@ -15,7 +15,9 @@ export default defineConfig({
   webServer: { command: "npm run start -- -p 3100", url: "http://localhost:3100", reuseExistingServer: true, timeout: 60_000,
     // MOCK Gemini for automated tests (needs BOTH flags). Live Gemini is verified separately by tests/live/gemini.live.spec.ts.
     env: process.env.DC_LIVE ? {} : { AI_PROVIDER: "mock", DC_ALLOW_AI_MOCK: "1" } },
-  use: { baseURL: "http://localhost:3100", trace: "off" },
+  // reducedMotion: the app (correctly) turns off `scroll-behavior: smooth` and animations for users who ask for reduced motion. With smooth scrolling on, Playwright's
+  // scroll-into-view returns before the page stops moving, so click hit-testing can loop forever against the sticky header / fixed mobile nav (seen as a ~20% hang of the mobile journey).
+  use: { baseURL: "http://localhost:3100", trace: "off", reducedMotion: "reduce" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], launchOptions } },
     { name: "mobile", use: { ...devices["Pixel 7"], launchOptions } },

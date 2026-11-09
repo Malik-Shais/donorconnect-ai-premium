@@ -5,6 +5,8 @@ import { login } from "./helpers";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 async function axe(page: Page, label: string) {
+  // Measure the SETTLED page: contrast checks on an element that is still fading in are meaningless (seen once as a rare false "color-contrast" on the hero pill).
+  await page.evaluate(() => document.fonts.ready.then(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)))));
   const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   expect(r.violations.map((v) => `${label}: ${v.id} (${v.impact}) x${v.nodes.length} ${v.nodes[0]?.target?.join(" ")}`), `axe violations on ${label}`).toEqual([]);
 }
