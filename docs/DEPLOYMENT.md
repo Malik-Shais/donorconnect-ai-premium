@@ -116,7 +116,7 @@ A realistic starting production cost is the Supabase Pro plan plus Vercel Pro pl
 
 ## Deployment blockers (do not launch until closed)
 
-1. No hosted staging environment has been created or tested (Auth e-mail confirmation, SMTP, Realtime policy, `request.headers` for the limiter).
+1. A private **staging** environment exists and the hosted backend is verified (migrations, RLS, limiter header, Realtime policy; see `docs/STAGING.md`). Still untested: Auth e-mail confirmation and real SMTP (staging auto-confirms), and a production-grade project (Pro plan, backups, custom domain).
 2. Legal/privacy review of health-adjacent data handling, retention and a privacy notice/terms (none written).
 3. CAPTCHA and IP-level protection (finding F9).
 4. A production e-mail sending domain and the e-mail worker host.

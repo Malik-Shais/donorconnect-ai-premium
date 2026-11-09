@@ -25,7 +25,8 @@ All results are from the **local Docker stack** (real PostgreSQL, GoTrue, PostgR
 | Load test (1 200 users) | **PASS** (see below) | |
 | Outage drill (API + auth containers stopped) | **PASS** | 503 from `/api/health`, redirect to sign-in, no stack traces or hostnames, public pages still served; recovery needs the dev gateway restart (finding F11) |
 | Screen-reader testing (NVDA/VoiceOver/TalkBack) | **NOT TESTED** | automated axe + keyboard only |
-| Hosted Supabase / Vercel / real SMTP / e-mail confirmation flow / hosted Realtime | **NOT TESTED** | no hosted project configured |
+| Hosted Supabase (free project, Mumbai, PostgreSQL 17) | **PASS** (2026-11-09) | all 10 migrations applied; hosted audit identical to local; auth, rate limiter, live Realtime, consent, analytics, exports, role isolation checked against the hosted backend with the production build (`docs/STAGING.md`) |
+| Vercel-served instance, real SMTP, e-mail confirmation flow | **NOT TESTED by automation** | the Vercel preview is behind Vercel Authentication; staging uses auto-confirm because the free built-in e-mail sender allows about 2 e-mails per hour |
 | Report error banner, interrupted browser requests to the AI route | **NOT TESTED** end-to-end | the mock covers quota/unavailable states |
 | Browser matrix | **NOT TESTED** | Chromium only (desktop + Pixel 7 emulation) |
 | Third-party penetration test, legal/privacy review | **NOT TESTED** | |
