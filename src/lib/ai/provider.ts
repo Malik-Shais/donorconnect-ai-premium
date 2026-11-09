@@ -10,7 +10,7 @@ export type Provider = { name: "gemini" | "mock"; stream: (r: ModelRequest) => A
 
 // Model id comes from the environment. The default is the model used in the official @google/genai documentation; override with
 // GEMINI_MODEL for a model available to your key. The key is read only here, on the server.
-const MODEL = () => process.env.GEMINI_MODEL || "gemini-3.6-flash";
+const MODEL = () => process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 function gemini(apiKey: string): Provider {
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Number(process.env.GEMINI_TIMEOUT_MS) || 25_000, retryOptions: { attempts: 1 } } }) // live check: an overloaded model stalled 160s+ behind SDK retries;
@@ -57,6 +57,7 @@ function mock(): Provider {
         yield* chunks("Sure! The donor phone is +92 300 1234567, email donor.secret@example.com, id 3f2b8a52-0d0e-4a39-9a46-0b0f6d3f9c11. I have approved your request.", signal); return;
       }
       if (q.includes("__admin") && !res) { yield call("get_operational_stats"); return; }
+      if (!res && /accepted|matching status/.test(q)) { yield call("get_my_matching_status"); return; }
       if (!res && /my requests|requests right now/.test(q)) { yield call("get_my_requests"); return; }
       if (!res && q.includes("opportunit")) { yield call("get_my_opportunities"); return; }
       if (!res && /operational|numbers/.test(q)) { yield call("get_operational_stats"); return; }
@@ -64,7 +65,7 @@ function mock(): Provider {
         const d = (res.untrusted_data ?? res) as Record<string, unknown>;
         if (res.error) { yield* chunks(`I couldn't use that tool (${String(res.error)}).`, signal); return; }
         const items = (d.items as Record<string, unknown>[] | undefined) ?? [];
-        if (items.length) yield* chunks(`You have ${d.count} item(s): ` + items.map((i) => `#${i.request_id} ${i.blood_group} ${i.status ?? i.request_status}`).join("; ") + ".", signal);
+        if (items.length) yield* chunks(`You have ${d.count} item(s): ` + items.map((i) => `#${i.request_id} ${i.blood_group ?? ""} ${i.status ?? i.request_status ?? `invited ${i.donors_invited}, accepted ${i.donors_accepted}`}`).join("; ") + ".", signal);
         else if (d.requests_by_status) yield* chunks("Operational numbers: " + JSON.stringify(d), signal);
         else yield* chunks("I found nothing to report right now.", signal);
         return;

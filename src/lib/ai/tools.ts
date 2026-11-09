@@ -63,6 +63,16 @@ const TOOLS: Record<string, Tool> = {
       return { count: (data ?? []).length, items: (data ?? []).map((r) => ({ request_id: num(r.id), blood_group: str(r.blood_group, 4), units: num(r.units), city: str(r.city), urgency: str(r.urgency, 10), status: str(r.status, 16), submitted: str(r.created_at, 10) })) };
     },
   },
+  get_my_matching_status: {
+    description: "For the signed-in requester's own requests: how many donors were invited, accepted, declined or withdrew. Counts only; donors are never identified.",
+    roles: ["requester"], parameters: none,
+    run: async (_a, { supabase }) => {
+      const { data, error } = await supabase.rpc("requester_match_summary");
+      if (error) return { unavailable: true };
+      const rows = (data ?? []) as Record<string, unknown>[];
+      return { count: rows.length, items: rows.slice(0, MAX).map((r) => ({ request_id: num(r.request_id), donors_invited: num(r.invited), donors_accepted: num(r.accepted), donors_declined: num(r.declined), donors_withdrawn: num(r.withdrawn) })) };
+    },
+  },
   get_operational_stats: {
     description: "Aggregate, non-sensitive operational counts for administrators (requests by status, users by role, pending reviews).",
     roles: ["admin"], parameters: none,
@@ -71,7 +81,9 @@ const TOOLS: Record<string, Tool> = {
       const req = async (s: string) => (await supabase.from("blood_requests").select("id", head).eq("status", s)).count ?? 0;
       const usr = async (r: string) => (await supabase.from("profiles").select("id", head).eq("role", r)).count ?? 0;
       const [pending_review, approved, matched, fulfilled, rejected, cancelled, donors, requesters] = await Promise.all([req("pending_review"), req("approved"), req("matched"), req("fulfilled"), req("rejected"), req("cancelled"), usr("donor"), usr("requester")]);
-      return { requests_by_status: { pending_review, approved, matched, fulfilled, rejected, cancelled }, users_by_role: { donors, requesters } };
+      const oldest = await supabase.from("blood_requests").select("created_at").eq("status", "pending_review").order("created_at").limit(1);
+      const hours = oldest.data?.[0]?.created_at ? Math.max(0, Math.round((Date.now() - new Date(String(oldest.data[0].created_at)).getTime()) / 3_600_000)) : null;
+      return { requests_by_status: { pending_review, approved, matched, fulfilled, rejected, cancelled }, users_by_role: { donors, requesters }, oldest_pending_review_hours: hours };
     },
   },
 };

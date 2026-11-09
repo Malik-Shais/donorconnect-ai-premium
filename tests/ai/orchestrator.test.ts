@@ -32,7 +32,7 @@ describe("orchestrator", () => {
     const p = scripted([{ type: "text", text: "Requests are reviewed by an administrator before donors see them." }]);
     const ev = await collect(base("requester", p, "What happens after I submit?"));
     expect(text(ev)).toContain("reviewed by an administrator");
-    expect(p.seen[0].tools.map((t) => t.name).sort()).toEqual(["get_my_requests", "get_notification_summary", "get_platform_help"]);
+    expect(p.seen[0].tools.map((t) => t.name).sort()).toEqual(["get_my_matching_status", "get_my_requests", "get_notification_summary", "get_platform_help"]);
   });
   it("prompt injection in history stays inside an untrusted transcript in the user turn", async () => {
     const p = scripted([{ type: "text", text: "Fine." }]);

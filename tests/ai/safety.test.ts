@@ -63,7 +63,7 @@ describe("tool permission matrix", () => {
   const names = (r: "donor" | "requester" | "admin") => allowedToolNames(r).sort();
   it("each role is offered only its own read-only tools", () => {
     expect(names("donor")).toEqual(["get_my_offers", "get_my_opportunities", "get_notification_summary", "get_platform_help"]);
-    expect(names("requester")).toEqual(["get_my_requests", "get_notification_summary", "get_platform_help"]);
+    expect(names("requester")).toEqual(["get_my_matching_status", "get_my_requests", "get_notification_summary", "get_platform_help"]);
     expect(names("admin")).toEqual(["get_notification_summary", "get_operational_stats", "get_platform_help"]);
   });
   it("no tool name suggests a write, contact disclosure or raw SQL", () => {

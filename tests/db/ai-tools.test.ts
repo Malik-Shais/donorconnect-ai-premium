@@ -69,8 +69,22 @@ d("AI tools: real permissions, isolation and data minimisation", () => {
     const t = await token("admin@demo.example", "Demo@12345");
     const sb = createClient(URL_!, ANON!, { global: { headers: { Authorization: `Bearer ${t.jwt}` } }, auth: { persistSession: false, autoRefreshToken: false } });
     const out = (await runTool("get_operational_stats", {}, { role: "admin", supabase: sb })) as { untrusted_data: Record<string, Record<string, number>> };
-    expect(Object.keys(out.untrusted_data).sort()).toEqual(["requests_by_status", "users_by_role"]);
+    expect(Object.keys(out.untrusted_data).sort()).toEqual(["oldest_pending_review_hours", "requests_by_status", "users_by_role"]);
     expect(Object.values(out.untrusted_data.requests_by_status).every((n) => typeof n === "number")).toBe(true);
+  });
+
+  it("get_my_matching_status: a requester sees only counts for their own requests; other requesters and donors get nothing", async () => {
+    const city = `AI-${randomUUID().slice(0, 6)}`;
+    const a = await user({ role: "requester" }), b = await user({ role: "requester" }), donor = await user({ role: "donor", city, blood_group: "O+" });
+    const id = await makeRequest(a.id, "A+", city); await approve(id);
+    await a.sb.rpc("invite_donors", { p_id: id });
+    await donor.sb.rpc("accept_request", { p_request_id: id, p_share_contact: true });
+    const mine = await run("get_my_matching_status", a, "requester");
+    expect(mine.untrusted_data?.items).toEqual([{ request_id: Number(id), donors_invited: 0, donors_accepted: 1, donors_declined: 0, donors_withdrawn: 0 }]);
+    expect(JSON.stringify(mine)).not.toMatch(/donor_id|@test\.example|contact|phone/i);
+    expect((await run("get_my_matching_status", b, "requester")).untrusted_data?.count).toBe(0);                 // someone else's requests
+    expect((await run("get_my_matching_status", donor, "requester")).untrusted_data?.count).toBe(0);             // forged role: the SQL function returns no rows for a donor
+    expect(await run("get_my_matching_status", a, "donor")).toEqual({ error: "tool_not_available" });
   });
 
   it("notification summary is counts only (no notification text)", async () => {
