@@ -12,11 +12,12 @@ describe("classifyMessage (medical + emergency boundary)", () => {
   it.each([
     "Can I donate blood today?", "am I eligible to donate?", "I'm on medication, can I give blood?", "I have diabetes, may I donate",
     "Should my mother receive a transfusion?", "Do I need a transfusion?", "Is this blood safe for me?", "Please diagnose my symptoms",
-    "what treatment plan should I follow", "my lab results are low, what do they mean",
+    "what treatment plan should I follow", "my lab results are low, what do they mean", "Do I have a fever?", "Do I have an infection", "do I have the flu",
   ])("medical decision: %s", (t) => expect(classifyMessage(t)).toBe("medical_decision"));
   it.each([
     "How do I submit a request?", "What does pending review mean?", "Show my requests", "What is the general blood group compatibility guide?",
     "How does contact sharing work?", "Which page lists open opportunities?", "What are the numbers for pending reviews?",
+    "What offers do I have and is my contact sharing on for them?", "Do I have an offer waiting?", "Do I have any pending invitations?", "Do I have a request that was matched?",
   ])("ok: %s", (t) => expect(classifyMessage(t)).toBe("ok"));
 });
 

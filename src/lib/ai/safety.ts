@@ -10,7 +10,7 @@ const MEDICAL_DECISION: RegExp[] = [
   /\b(my|i have|i('m| am) (on|taking|pregnant|sick|ill)|diagnosed)\b.{0,60}\b(blood pressure|haemoglobin|hemoglobin|iron|medication|medicine|tattoo|pregnan\w*|diabet\w*|cancer|hiv|hepatitis|anaemi\w*|anemi\w*|fever|infection)\b/i,
   /\b(can|should|am i|is it safe for) (i|me|my (mother|father|mom|dad|child|son|daughter|wife|husband|brother|sister|friend|patient))\b.{0,50}\b(receive|get|take|have|be given|need)\b.{0,30}\b(blood|transfusion|platelets|plasma)\b/i,
   /\bdo (i|they|he|she) need (a )?(blood|transfusion)\b/i,
-  /\b(diagnos\w*|prescri\w*|dosage|which (medicine|medication|drug)|treatment (for|plan)|what (disease|condition|illness)|do i have (an?|the)?\s*\w+|my (lab|test|blood) results?)\b/i,
+  /\b(diagnos\w*|prescri\w*|dosage|which (medicine|medication|drug)|treatment (for|plan)|what (disease|condition|illness)|do i have (an?|the)\s+(?!offers?\b|requests?\b|invit\w*|opportunit\w*|notification\w*|match\w*|pending\b|open\b|accepted\b)\w+|my (lab|test|blood) results?)\b/i,
   /\b(is|are) (this|that|the) (blood|unit|donor)\b.{0,30}\b(safe|compatible|ok|okay|suitable)\b.{0,20}\b(for|with) (me|my|him|her|them|the patient)\b/i,
 ];
 export type Verdict = "emergency" | "medical_decision" | "ok";
