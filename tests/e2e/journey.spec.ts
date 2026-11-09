@@ -143,9 +143,12 @@ test("cancellation: requester cancels a pending request and it leaves the admin 
 test("invitations: requester invites anonymously, donor declines/accepts from My offers", async ({ browser }) => {
   const s = stamp(), city = `Ci${s}`, hospital = `Invite Hospital ${s}`;
   const requester = await newUser(browser, { email: uniq("rq"), role: "requester", city });
-  const donor = await newUser(browser, donorOpts(city, `Ivy Invite ${s}`));
+  // Invitations also fill up with compatible donors from OTHER cities, so this test uses a group (A- recipient: only A-/O- donors are compatible)
+  // that every other e2e donor (O+) cannot match. Otherwise, on a small fresh database, it can add an unexpected unread notification to
+  // a parallel test's donor and break that test's exact unread-count assertions.
+  const donor = await newUser(browser, { ...donorOpts(city, `Ivy Invite ${s}`), group: "A-" });
   const admin = await newAdmin(browser);
-  await submitRequest(requester.page, { hospital, city });
+  await submitRequest(requester.page, { hospital, city, group: "A-" });
   const url = requester.page.url().split("?")[0];
   await adminApprove(admin.page, hospital);
   await requester.page.goto(url);
