@@ -120,7 +120,7 @@ d("status transitions are authorised in the server AND the database", () => {
   });
 
   it("admin moderation needs a note, notifies the requester and involved donors, and is audited", async () => {
-    const admin = await getAdmin(), req = await makeRequester(), donor = await makeDonor("O+", { city: city() }), id = await makeApprovedRequest(req, "A+");
+    const admin = await getAdmin(), c = city(), req = await makeRequester(), donor = await makeDonor("O+", { city: c }), id = await makeApprovedRequest(req, "A+", c);
     await as(donor, (q) => q("select public.accept_request($1,false)", [id]));
     await expect(transition(admin, id, "cancelled")).rejects.toThrow(/moderation note/);
     await expect(transition(admin, id, "fulfilled", "Marked by admin")).rejects.toThrow(/not allowed/); // admins cannot fulfil
@@ -135,7 +135,7 @@ d("status transitions are authorised in the server AND the database", () => {
 
 d("offers: invitations, idempotency, withdrawal and races", () => {
   it("accepting twice creates one offer and one notification", async () => {
-    const req = await makeRequester(), donor = await makeDonor("O+", { city: city() }), id = await makeApprovedRequest(req, "A+");
+    const c = city(), req = await makeRequester(), donor = await makeDonor("O+", { city: c }), id = await makeApprovedRequest(req, "A+", c);
     const a = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,true)", [id]));
     const b = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,false)", [id]));
     expect(a[0].accept_request).toBe(b[0].accept_request);
@@ -144,7 +144,7 @@ d("offers: invitations, idempotency, withdrawal and races", () => {
   });
 
   it("race: simultaneous accepts by the same donor produce exactly one offer, one notification, one 'matched' event", async () => {
-    const req = await makeRequester(), donor = await makeDonor("O+", { city: city() }), id = await makeApprovedRequest(req, "A+");
+    const c = city(), req = await makeRequester(), donor = await makeDonor("O+", { city: c }), id = await makeApprovedRequest(req, "A+", c);
     const results = await Promise.allSettled(Array.from({ length: 6 }, () => as(donor, (q) => q("select public.accept_request($1,true)", [id]))));
     expect(results.every((r) => r.status === "fulfilled")).toBe(true);
     expect((await root("select count(*)::int n from public.offers where request_id=$1", [id]))[0].n).toBe(1);
@@ -222,8 +222,8 @@ d("offers: invitations, idempotency, withdrawal and races", () => {
 
 d("contact consent and disclosure", () => {
   it("contacts are visible only while the request is active, never to admins, and the disclosure is audited without content", async () => {
-    const admin = await getAdmin(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+");
-    const donor = await makeDonor("O+", { city: city(), phone: "0300 9998887" });
+    const admin = await getAdmin(), c = city(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+", c);
+    const donor = await makeDonor("O+", { city: c, phone: "0300 9998887" });
     const [{ accept_request: oid }] = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,true)", [id]));
     expect((await offersOf(req, id))[0]).toMatchObject({ contact_shared: true, phone: "0300 9998887" });
     await offersOf(req, id); // second view inside 10 minutes must not add another audit row
@@ -239,7 +239,7 @@ d("contact consent and disclosure", () => {
   });
 
   it("revocation takes effect immediately for future views; granting later works while the offer is active", async () => {
-    const req = await makeRequester(), id = await makeApprovedRequest(req, "A+"), donor = await makeDonor("O+", { city: city(), phone: "0300 1010101" });
+    const c = city(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+", c), donor = await makeDonor("O+", { city: c, phone: "0300 1010101" });
     const oid = (await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,false)", [id])))[0].accept_request;
     expect((await offersOf(req, id))[0].phone).toBeNull();
     await as(donor, (q) => q("select public.set_contact_consent($1,true)", [oid]));

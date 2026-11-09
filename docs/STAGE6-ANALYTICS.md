@@ -54,7 +54,7 @@ Requester: approved ÷ reviewed, with-donor ÷ approved, fulfilled ÷ approved, 
 
 ### Known limits
 * A withdrawn offer keeps its `accepted_at`, so a request whose donor later withdrew still counts as "has had a response".
-* `invite_donors` may invite compatible donors from other cities (existing behaviour), so invitation counts are not city-bound.
+* Invitations are same-city only (migration `…1114000001`); invitations created before that migration may include other cities.
 * City is free text; it is grouped case-insensitively, not spell-corrected.
 * Supply compares people with units; it says nothing about stock, medical suitability, or whether a donor can actually reach the hospital.
 

@@ -159,7 +159,7 @@ test("invitations: requester invites anonymously, donor declines/accepts from My
   await expect(requester.page.getByText(`Ivy Invite ${s}`)).toHaveCount(0);
 
   await donor.page.goto("/dashboard/donor/offers");
-  // Invitations rank same-city donors first, then fill with other compatible donors, so other tests' requests may also invite this donor.
+  // Invitations are same-city only: this donor shares the request's city.
   const invitation = donor.page.locator("li", { hasText: hospital });
   await expect(invitation).toBeVisible();
   await invitation.getByRole("button", { name: "Accept invitation" }).click();

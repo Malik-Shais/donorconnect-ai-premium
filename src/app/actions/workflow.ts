@@ -36,7 +36,7 @@ export async function inviteDonorsAction(_: FormState, fd: FormData): Promise<Fo
   const p = inviteSchema.safeParse(Object.fromEntries(fd)); if (!p.success) return bad(p);
   const r = await rpc<number>("invite_donors", { p_id: p.data.id });
   if (r.error) return { error: r.error };
-  return ok(r.data ? `Invited ${r.data} preliminary match${r.data === 1 ? "" : "es"}. Their identity stays private until they accept.` : "No further matching donors are available right now.");
+  return ok(r.data ? `Invited ${r.data} preliminary match${r.data === 1 ? "" : "es"}. Their identity stays private until they accept.` : "No further compatible, available donors are registered in this request's city. Check that the city is spelled the same way donors enter it.");
 }
 
 export async function reviewRequestAction(_: FormState, fd: FormData): Promise<FormState> {

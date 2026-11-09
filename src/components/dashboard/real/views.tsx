@@ -62,7 +62,7 @@ export async function DonorHome({ s }: { s: Session }) {
         <Card><CardTitle>Preliminary compatibility</CardTitle>
           <p><b>Could go to:</b> {canGiveTo(d.blood_group).join(", ")}</p><p className="mt-1"><b>Could receive from:</b> {canReceiveFrom(d.blood_group).join(", ")}</p></Card>
         <Card className="lg:col-span-2"><CardTitle>Requests near you</CardTitle>
-          {open.length ? <ul className="divide-y divide-line">{open.slice(0, 4).map((r) => <ReqRow key={r.id} r={r} />)}</ul> : <Empty>No compatible approved requests right now. We&apos;ll notify you when one appears.</Empty>}
+          {open.length ? <ul className="divide-y divide-line">{open.slice(0, 4).map((r) => <ReqRow key={r.id} r={r} />)}</ul> : <Empty>No compatible approved requests in your city right now. We&apos;ll notify you when one appears.</Empty>}
           {open.length > 0 && <Link href="/dashboard/donor/opportunities" className="mt-3 inline-block text-sm font-semibold text-teal underline">See all opportunities</Link>}
         </Card>
       </div>
@@ -140,7 +140,7 @@ export async function OpportunitiesView({ s, group, city }: { s: Session; group?
             <Button size="sm">Apply filters</Button>
             {(group || city) && <Link href="/dashboard/donor/opportunities" className="text-sm font-semibold text-teal underline">Clear</Link>}
           </form>
-          {open.length === 0 ? <Card><Empty>{all.length ? "No requests match your filters." : "No compatible approved requests right now."}</Empty></Card> : (
+          {open.length === 0 ? <Card><Empty>{all.length ? "No requests match your filters." : "No compatible approved requests in your city right now. Check that your profile city is correct."}</Empty></Card> : (
             <ul className="grid gap-3" aria-label={`${open.length} opportunities`}>{open.map((r) => (
               <li key={r.id}><Card>
                 <ul><ReqRow r={r} extra={r.city_match ? <Badge tone="matched">Your city</Badge> : null} /></ul>

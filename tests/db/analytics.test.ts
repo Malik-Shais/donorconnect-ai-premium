@@ -86,7 +86,7 @@ d("admin analytics: controlled dataset with known answers", () => {
 
   it("invitation, offer and consent workflow statistics", async () => {
     const { workflow } = await adm();
-    // invite_donors also invites compatible donors from other cities (up to its cap), so the expected count comes from the table itself
+    // invitation count comes from the table itself (invite_donors is same-city only)
     const inv = Number((await root<{ n: string }>("select count(*) as n from public.offers where request_id=$1 and origin='invited'", [ids.r2]))[0].n);
     expect(inv).toBeGreaterThanOrEqual(2);
     expect(workflow.invitations_sent).toBe(inv);

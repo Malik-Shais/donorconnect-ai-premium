@@ -57,7 +57,7 @@ export async function RequesterRequestDetail({ id, submitted }: { id: number; su
         <Card><CardTitle>Details</CardTitle><Summary r={r} /></Card>
         <Card><CardTitle>Actions</CardTitle>
           <div className="grid gap-4">
-            {active && <div><InlineAction action={inviteDonorsAction} fields={{ id }} label="Invite matching donors" variant="teal" /><p className="mt-2 text-xs text-muted">Invites up to 20 preliminary matches. They stay anonymous to you until they accept and consent.</p></div>}
+            {active && <div><InlineAction action={inviteDonorsAction} fields={{ id }} label="Invite matching donors" variant="teal" /><p className="mt-2 text-xs text-muted">Invites up to 20 compatible, available donors in this request&apos;s city only. They stay anonymous to you until they accept and consent.</p></div>}
             <div className="flex flex-wrap gap-2">
               {r.status === "matched" && <ActionDialog action={transitionRequestAction} fields={{ id, to: "fulfilled" }} trigger="Mark fulfilled" triggerVariant="teal" title="Mark this request fulfilled?" confirm="Mark fulfilled" variant="teal"
                 description="Use this once the blood need has been met. Donor contact details will no longer be shown." noteLabel="Note" />}
