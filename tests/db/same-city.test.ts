@@ -110,3 +110,28 @@ d("donors cannot see or accept requests outside their city, including direct RPC
     expect(await openIds(near)).toContain(id);
   });
 });
+
+d("edge case: accept_request's idempotent early return cannot be used to cross cities", () => {
+  const notifCount = (id: string) => root<{ n: number }>("select count(*)::int n from public.notifications where link like $1", [`%/requests/${id}`]).then((r) => r[0].n);
+
+  it("an offer accepted before the donor moved is returned as-is: no new offer, notification, status change or consent change", async () => {
+    const c = city(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+", c), donor = await makeDonor("O+", { city: c, phone: "0300 7770101" });
+    const [{ accept_request: oid }] = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,true)", [id]));
+    const before = await notifCount(id);
+    await as(donor, (q) => q("update public.profiles set city=$1 where id=auth.uid()", [city()])); // the donor moves away
+    const [{ accept_request: again }] = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,false)", [id]));
+    expect(again).toBe(oid);
+    expect(await root("select 1 from public.offers where request_id=$1", [id])).toHaveLength(1);
+    expect(await notifCount(id)).toBe(before);
+    expect((await root<{ granted: boolean }>("select granted from public.contact_consents where offer_id=$1", [oid]))[0].granted).toBe(true); // the repeat call (share=false) changed nothing
+  });
+
+  it("after withdrawing, a donor who has moved cannot re-accept (the city check applies to every new acceptance)", async () => {
+    const c = city(), req = await makeRequester(), id = await makeApprovedRequest(req, "A+", c), donor = await makeDonor("O+", { city: c });
+    const [{ accept_request: oid }] = await as(donor, (q) => q<{ accept_request: string }>("select public.accept_request($1,true)", [id]));
+    await as(donor, (q) => q("select public.withdraw_offer($1)", [oid]));
+    await as(donor, (q) => q("update public.profiles set city=$1 where id=auth.uid()", [city()]));
+    await expect(accept(donor, id, true)).rejects.toThrow(/outside your city/);
+    expect((await offersFor(donor, id))[0].status).toBe("withdrawn");
+  });
+});
