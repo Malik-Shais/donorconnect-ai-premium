@@ -7,8 +7,8 @@ export const Drop = ({ className }: { className?: string }) => (
 
 export function Brand({ light, href = "/" }: { light?: boolean; href?: string }) {
   return (
-    <Link href={href} className={cn("inline-flex items-center gap-2.5 whitespace-nowrap font-display text-base font-bold sm:text-lg", light ? "text-white" : "text-burgundy")}>
-      <Drop /> DonorConnect AI
+    <Link href={href} className={cn("inline-flex min-w-0 items-center gap-2.5 font-display text-base font-bold sm:text-lg", light ? "text-white" : "text-burgundy")}>
+      <Drop /> <span className="truncate">DonorConnect AI</span>
     </Link>
   );
 }

@@ -27,9 +27,9 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-line bg-offwhite/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-5">
           <Brand />
-          <nav aria-label="Account" className="flex gap-1.5 sm:gap-2">
-            <Button asChild variant="outline" size="sm" className="px-3 sm:px-4"><Link href="/login">Sign in</Link></Button>
-            <Button asChild size="sm" className="px-3 sm:px-4"><Link href="/register">Join free</Link></Button>
+          <nav aria-label="Account" className="flex shrink-0 gap-1 sm:gap-2">
+            <Button asChild variant="outline" size="sm" className="px-2.5 sm:px-4"><Link href="/login">Sign in</Link></Button>
+            <Button asChild size="sm" className="px-2.5 sm:px-4"><Link href="/register">Join free</Link></Button>
           </nav>
         </div>
       </header>
