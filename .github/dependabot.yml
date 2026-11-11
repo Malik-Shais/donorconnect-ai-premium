@@ -1,0 +1,12 @@
+# Minor/patch updates only, grouped. Major upgrades are deliberately excluded: they are reviewed and tested by hand (docs/DEPENDENCIES.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    ignore: [{ dependency-name: "*", update-types: ["version-update:semver-major"] }]
+    groups: { minor-and-patch: { update-types: [minor, patch] } }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
