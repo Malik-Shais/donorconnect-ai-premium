@@ -34,7 +34,8 @@ d("notification categories, preferences and ping events", () => {
     expect(rows.length).toBeGreaterThanOrEqual(2); // welcome + the insert above
     // "id" is Realtime's own random message id; the only application data is notification_id
     for (const r of rows) { expect(r.event).toBe("notification"); expect(Object.keys(r.payload).sort()).toEqual(["id", "notification_id"]); }
-    expect(JSON.stringify(rows)).not.toMatch(/SECRET|Patient|0300/);
+    // scan everything except Realtime's random message id (a random UUID can legitimately start with "0300", which made this assertion flaky)
+    expect(JSON.stringify(rows.map((r) => ({ topic: r.topic, event: r.event, notification_id: r.payload.notification_id })))).not.toMatch(/SECRET|Patient|0300/);
     // RLS on realtime.messages: only the owner can read their topic; nobody else, nobody anonymous, nobody can publish
     // The Realtime server sets realtime.topic per connection; emulate it. Claiming a topic is not enough: it must equal notif:<own uid>.
     const readAs = (u: string, claimed: string) => as(u, async (q) => { await q("select set_config('realtime.topic', $1, true)", [claimed]); return q("select * from realtime.messages where topic=$1", [`notif:${a}`]); });
